@@ -1,0 +1,41 @@
+name: Public release keeper
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: home-base-public-keeper-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  keeper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the public retrieval client
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+
+      - name: Discover and download the public stable release
+        run: |
+          node system/retrieve-release.mjs discover --channel stable
+          node system/retrieve-release.mjs download --channel stable --output /tmp/home-base-public-keeper
+
+      - name: Prove the extracted Home Base
+        working-directory: /tmp/home-base-public-keeper/home-base
+        run: |
+          node system/validate.mjs
+          node system/prove.mjs
+          node system/test-capability-doctor.mjs
+          node system/test-safe-update.mjs
+          node system/test-release-retrieval.mjs
+          node system/inspect-runtime.mjs
