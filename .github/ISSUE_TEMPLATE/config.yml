@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support boundaries
+    url: https://github.com/MattEspo23/home-base/blob/main/SUPPORT.md
+    about: Read supported releases, environments, and safe reporting guidance.
+  - name: Sensitive security report
+    url: https://github.com/MattEspo23/home-base/security/advisories/new
+    about: Use only after private vulnerability reporting is enabled; never post sensitive details publicly.

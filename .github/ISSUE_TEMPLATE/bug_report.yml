@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible Home Base defect with sanitized evidence.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, client data, proprietary source, private prompts, or unredacted diagnostic output. Use SECURITY.md for sensitive reports.
+  - type: input
+    id: release
+    attributes:
+      label: Home Base release
+      description: Use an immutable tag or full commit.
+      placeholder: v1.0.0 or 40-character commit
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host
+      options:
+        - Codex Desktop on macOS
+        - Claude Code preview
+        - Other / unverified
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Sanitized reproduction
+      description: Give the smallest safe steps that reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, client data, proprietary source, private prompts, and unredacted diagnostic output.
+          required: true
+        - label: This report does not need the private vulnerability channel described in SECURITY.md.
+          required: true

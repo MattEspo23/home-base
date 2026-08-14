@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Synthetic Daily Follow-Up Brief reference interface for Home Base 1.0."
+    />
+    <title>Daily Follow-Up Brief</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">HOME BASE · SYNTHETIC PROOF</p>
+          <h1>Daily Follow-Up Brief</h1>
+          <p class="subtitle">
+            A calm review queue built from labeled test email and calendar
+            data. Drafts only. Nothing can send.
+          </p>
+        </div>
+        <div class="safety-badge" aria-label="Send capability disabled">
+          <span class="safety-dot"></span>
+          Sends disabled
+        </div>
+      </header>
+
+      <section class="metrics" aria-label="Brief summary">
+        <article>
+          <span>Needs review</span>
+          <strong id="queue-count">0</strong>
+        </article>
+        <article>
+          <span>Data mode</span>
+          <strong>Synthetic</strong>
+        </article>
+        <article>
+          <span>Authority</span>
+          <strong>Read + draft</strong>
+        </article>
+      </section>
+
+      <section class="section-heading">
+        <div>
+          <p class="eyebrow">TODAY</p>
+          <h2>Review in priority order</h2>
+        </div>
+        <p id="generated-at" class="timestamp"></p>
+      </section>
+
+      <section id="queue" class="queue" aria-live="polite"></section>
+
+      <section class="boundary">
+        <div>
+          <p class="eyebrow">STOP GATE</p>
+          <h2>Review before any send</h2>
+        </div>
+        <p>
+          This reference interface cannot send, publish, purchase, change an
+          appointment, or contact a third party. A real system requires a new
+          Build Mode preview and exact approval for any of those actions.
+        </p>
+      </section>
+    </main>
+
+    <script src="./demo-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

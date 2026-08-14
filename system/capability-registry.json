@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "capabilities": [
+    {
+      "capability_id": "home-base-core-skills",
+      "label": "Home Base core workflows",
+      "capability_kind": "repo_skill_only",
+      "all_of": ["workflow"],
+      "any_of": [],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "skill-vault-skills",
+      "label": "Skill Vault workflows",
+      "capability_kind": "repo_skill_only",
+      "all_of": ["workflow"],
+      "any_of": [],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "home-base-updater",
+      "label": "Customization-preserving Home Base updater",
+      "capability_kind": "alternative",
+      "all_of": ["workflow", "host_command"],
+      "any_of": [],
+      "maximum_action": "usable_write"
+    },
+    {
+      "capability_id": "local-javascript",
+      "label": "Local JavaScript execution",
+      "capability_kind": "command_only",
+      "all_of": ["host_command"],
+      "any_of": [],
+      "maximum_action": "usable_write"
+    },
+    {
+      "capability_id": "git-local",
+      "label": "Local Git inspection",
+      "capability_kind": "command_only",
+      "all_of": ["host_command"],
+      "any_of": [],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "codex-cli",
+      "label": "Codex CLI",
+      "capability_kind": "command_only",
+      "all_of": ["host_command"],
+      "any_of": [],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "claude-code-cli",
+      "label": "Claude Code CLI",
+      "capability_kind": "command_only",
+      "all_of": ["host_command"],
+      "any_of": [],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "github-public-read",
+      "label": "Public GitHub reading",
+      "capability_kind": "alternative",
+      "all_of": [],
+      "any_of": [["host_command"], ["plugin_installation", "plugin_enablement"]],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "github-account-write",
+      "label": "Authenticated GitHub account changes",
+      "capability_kind": "alternative",
+      "all_of": ["auth_state", "permission_state"],
+      "any_of": [["host_command"], ["plugin_installation", "plugin_enablement"]],
+      "maximum_action": "usable_write"
+    },
+    {
+      "capability_id": "browser-control",
+      "label": "Browser inspection",
+      "capability_kind": "plugin_only",
+      "all_of": ["plugin_installation", "plugin_enablement"],
+      "any_of": [],
+      "maximum_action": "usable_read_only"
+    },
+    {
+      "capability_id": "google-drive-write",
+      "label": "Connected Google Drive changes",
+      "capability_kind": "plugin_connector",
+      "all_of": ["plugin_installation", "plugin_enablement", "connector_configuration", "auth_state", "permission_state"],
+      "any_of": [],
+      "maximum_action": "usable_write"
+    }
+  ]
+}

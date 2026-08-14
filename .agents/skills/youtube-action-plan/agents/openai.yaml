@@ -1,0 +1,4 @@
+interface:
+  display_name: "YouTube Action Plan"
+  short_description: "Turn a video into an application plan"
+  default_prompt: "Use $youtube-action-plan to turn this video into a focused action plan."

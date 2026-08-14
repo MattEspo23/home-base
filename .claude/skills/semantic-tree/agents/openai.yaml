@@ -1,0 +1,4 @@
+interface:
+  display_name: "Semantic Tree"
+  short_description: "Turn a vague idea into a decision map"
+  default_prompt: "Use $semantic-tree to map this idea into decisions and next actions."

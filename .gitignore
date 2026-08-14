@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.*
+*.key
+*.pem
+CLAUDE.local.md
+.home-base/
+*.tgz

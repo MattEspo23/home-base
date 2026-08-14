@@ -1,0 +1,343 @@
+{
+  "schemaVersion": 2,
+  "source": {
+    "state": "released",
+    "version": "0.1.3",
+    "repository": "https://github.com/MattEspo23/skills",
+    "tag": "v0.1.3",
+    "commit": "cf0df42008cdffa79556a35ef79b803d3b2f19d7",
+    "tree": "13d65f76bc07afd05b14e1318b2610bf47d13926"
+  },
+  "adapters": [
+    ".agents/skills",
+    ".claude/skills"
+  ],
+  "packageCount": 27,
+  "packages": [
+    {
+      "name": "ask-espo",
+      "category": "engineering",
+      "description": "Ask which skill or flow fits your situation. A router over the skills in this repo.",
+      "sourcePath": "skills/engineering/ask-espo",
+      "files": {
+        "agents/openai.yaml": "900600e9e8d6352aedad8037b9840cfd237e167533d7be88d257fa0798c6e270",
+        "PHASE-BOUNDARIES.md": "bd0fe4291d25064080a5b880a17d2ebe320e65a63747a2d69a64b04d72a0d03e",
+        "SKILL.md": "2fe8461101af95972b921820011be0aa39c14619de367701b4dd9ecf173a5b12"
+      }
+    },
+    {
+      "name": "code-review",
+      "category": "engineering",
+      "description": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\".",
+      "sourcePath": "skills/engineering/code-review",
+      "files": {
+        "agents/openai.yaml": "8229ca854e11dc8e6aef2131ee03f31fb1561cf905fab9ccc325180cf3331352",
+        "SKILL.md": "fab4bf12791e21ce91d5f935afbbeba761fddce02d36f897bb22336532101489"
+      }
+    },
+    {
+      "name": "codebase-design",
+      "category": "engineering",
+      "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.",
+      "sourcePath": "skills/engineering/codebase-design",
+      "files": {
+        "agents/openai.yaml": "edebc9e4fcfe102114012575eaa9600b9b5fd08c311664f389c36e7bc717740f",
+        "DEEPENING.md": "125e6b77413ad2bc7cf7a772bc74336d580a50f9e797db2178ed133d62333d06",
+        "DESIGN-IT-TWICE.md": "09f9948ea7636a4d3704c5ab909762e876c0b39849eefb14d2e03a398cc9c7e7",
+        "SKILL.md": "a8d50abac5a4018f60e1d911d4b6f4e36454ca14d6c390c0695a578c7de65dad"
+      }
+    },
+    {
+      "name": "diagnosing-bugs",
+      "category": "engineering",
+      "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.",
+      "sourcePath": "skills/engineering/diagnosing-bugs",
+      "files": {
+        "agents/openai.yaml": "3e430dbe4334a87597488c060cb3dc3786bb00c9182877d6f5ec41f62490e90b",
+        "scripts/hitl-loop.template.sh": "18ae07e1cc49b32c71767e241a6e8de4be74ef21d5e3b7e39034d9c7335f2d80",
+        "SKILL.md": "b9339b09ee3980808d8c5a35c7251b891b8b1e0036ec4ca37812b976ebddf6b6"
+      }
+    },
+    {
+      "name": "domain-modeling",
+      "category": "engineering",
+      "description": "Build and sharpen a project's domain model. Use when the user wants to pin down domain terminology or a ubiquitous language, record an architectural decision, or when another skill needs to maintain the domain model.",
+      "sourcePath": "skills/engineering/domain-modeling",
+      "files": {
+        "ADR-FORMAT.md": "f1f36cd3f8d3b6474ddd5855da4e233bfc4ae1a1c5024909ccf11871819a41b2",
+        "agents/openai.yaml": "f6bf2aa996c6e6f53fdd0708e18a0d16a56aed8322cca59fedbe3c0d2c75f06b",
+        "CONTEXT-FORMAT.md": "b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597",
+        "SKILL.md": "152e2c97239affb12a60c5f4a7e74ab546a49ae169688c81f4e2ccc42dafa579"
+      }
+    },
+    {
+      "name": "grill-me",
+      "category": "productivity",
+      "description": "A relentless interview to sharpen a plan or design.",
+      "sourcePath": "skills/productivity/grill-me",
+      "files": {
+        "agents/openai.yaml": "c061e39c3e0f9d865fb1b97556d485704af2a8a58f4b8221a8917a5c2074a32b",
+        "SKILL.md": "97bf0f1eae1e15fb568ebae644eb4c62241095fe7e5625c0d584ac760f6c2400"
+      }
+    },
+    {
+      "name": "grill-with-docs",
+      "category": "engineering",
+      "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.",
+      "sourcePath": "skills/engineering/grill-with-docs",
+      "files": {
+        "agents/openai.yaml": "94cd0ab161fb468a836349f5ed482ba58ce8e709a05c57ce533d739dbd35cca9",
+        "SKILL.md": "7570664bfb28077163e27ac1484c2a433d4277f8bff5d22f9b91446815107e77"
+      }
+    },
+    {
+      "name": "grilling",
+      "category": "productivity",
+      "description": "Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.",
+      "sourcePath": "skills/productivity/grilling",
+      "files": {
+        "agents/openai.yaml": "1411d7df7d99b7e621a1ff8283c8133cc2464be63d064e52d8ce169c6800ee9b",
+        "SKILL.md": "fa5c1e5ee76b1c8f1ae56101f52c9e239de75d5c578adc61227b92d10b7e52ef"
+      }
+    },
+    {
+      "name": "handoff",
+      "category": "productivity",
+      "description": "Compact the current conversation into a handoff document for another agent to pick up.",
+      "sourcePath": "skills/productivity/handoff",
+      "files": {
+        "agents/openai.yaml": "5c479fd562c691851690e8b18c8501045bef0943c10743d636b2fae26add1d28",
+        "SKILL.md": "aa365c9c3fb57b52e282d901dc2ed8153707b9f54d3fa2a5d15499c2768aaead"
+      }
+    },
+    {
+      "name": "implement",
+      "category": "engineering",
+      "description": "Implement a piece of work based on a spec or set of tickets.",
+      "sourcePath": "skills/engineering/implement",
+      "files": {
+        "agents/openai.yaml": "8970a8596ade0c28ab427f41a4ea242d6bdf6186c59ebf55e1238dbecaab79dc",
+        "SKILL.md": "dc27831f466b865bf9e95f28c9361e9e99d59bcfb72a9585aa49a6829b3de3f8"
+      }
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "category": "engineering",
+      "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.",
+      "sourcePath": "skills/engineering/improve-codebase-architecture",
+      "files": {
+        "agents/openai.yaml": "c8cb20f68ebf0edb4e497bc11ae5fcaa196004e661cd189015b04f4109ced7f1",
+        "HTML-REPORT.md": "0b0936104158abeef7246ff6cbabefa4dc055f17589f2833f2d93001421910a1",
+        "SKILL.md": "41120fb6f7849352f648dd9fd8869a863ad628235ab4997e3739bcfad19bdd62"
+      }
+    },
+    {
+      "name": "prototype",
+      "category": "engineering",
+      "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like.",
+      "sourcePath": "skills/engineering/prototype",
+      "files": {
+        "agents/openai.yaml": "5af65e43ab41a350436697b81e27b7f848d36782043b73c322bb2c9fa9cc55dc",
+        "LOGIC.md": "5aef84c2ef514dd2a7268433abd3ee8e47b35f42b60e0b5f7430ec4937f4f06a",
+        "SKILL.md": "2579ecf89a7fb7e73345117405c7ba9b9fb5ab22a78ecb08b0ce68b73f0148c2",
+        "UI.md": "e2ca04434be54acdee2f5df582ef8038fadf582bbcc99be0d2e27737ff8ed096"
+      }
+    },
+    {
+      "name": "research",
+      "category": "engineering",
+      "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.",
+      "sourcePath": "skills/engineering/research",
+      "files": {
+        "agents/openai.yaml": "9b4c470d63221c1f68f22df70b83e2f12401b317babe0d1b7b5f24a974474d0d",
+        "SKILL.md": "af378829f015775a3bcd65ff466826722e99359017ae6bae227ca4c9bd14049c"
+      }
+    },
+    {
+      "name": "resolving-merge-conflicts",
+      "category": "engineering",
+      "description": "Use when you need to resolve an in-progress git merge/rebase conflict.",
+      "sourcePath": "skills/engineering/resolving-merge-conflicts",
+      "files": {
+        "agents/openai.yaml": "a1f4f96838f2ed6282eb28abbbf99029cb8fadce552baf53da90a025b8bffddf",
+        "SKILL.md": "c7c9ba81362a786aac05d2223123bf1bd2f8a99c3243a72882ede9c68bedfb24"
+      }
+    },
+    {
+      "name": "semantic-tree",
+      "category": "engineering",
+      "description": "Turn a broad or tangled topic into a structured decision map that connects questions, evidence, assumptions, and next actions. Use when an idea feels larger than the first answer, several concerns are mixed together, or the user needs to see what actually changes the decision before choosing a direction.",
+      "sourcePath": "skills/engineering/semantic-tree",
+      "files": {
+        "agents/openai.yaml": "d72e73204c764886eb1cb284da82fb8e74639850a95cdebd0a20ee3d4ebba8d0",
+        "SKILL.md": "26244de62fdfa6f096ff53d925470a5ffb4cffb964ab346ad1609c0b8ff8487b"
+      }
+    },
+    {
+      "name": "setup-espo-skills",
+      "category": "engineering",
+      "description": "Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.",
+      "sourcePath": "skills/engineering/setup-espo-skills",
+      "files": {
+        "agents/openai.yaml": "756e988e0319f3064f789dd8456678651c46944ac7521244e95add7c9f14817d",
+        "domain.md": "25be404b58798b3cb2d51c93dba2ab052fc3a425632185726ac3f5fcff193b99",
+        "issue-tracker-github.md": "ec8332bb69e7e79e349989e940be481a0c79b552be3acc613e718278bcc5e03d",
+        "issue-tracker-gitlab.md": "16ea4a727803876cbc763e1f6b00992b3b393ba5e0cd394382dccc0f8d83c564",
+        "issue-tracker-local.md": "6f38f66f9ffce2fdc26c43608d06b527f60e45c6f43003d0ea77d4e2641c9de3",
+        "SKILL.md": "e4c657545852cea830fe045cb1a8f49d1a5f645b203c8eb708209b7ffa15772d",
+        "triage-labels.md": "736b5558d24e58f703c5d5be739a63040c3df7c3a2ff3cf93434836e46d0bb03"
+      }
+    },
+    {
+      "name": "tdd",
+      "category": "engineering",
+      "description": "Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests.",
+      "sourcePath": "skills/engineering/tdd",
+      "files": {
+        "agents/openai.yaml": "ea6f01cf1b8c06a4b0f5b649d74b1b8ce8685e72af1b38d70d877693e092af0b",
+        "mocking.md": "3ceb807fdf4a47d6a93d4d9a891e5ba6d362a6247bd08adc451feebfc17361ef",
+        "SKILL.md": "5e6b9c16b547113e90afbb946489d1c1384be5c2128f0159bd0bee57251ecf08",
+        "tests.md": "859f9e592c188fda4fc7277dd180e4ce9c7a2e13f6efe1f6f29eccc9d28c106a"
+      }
+    },
+    {
+      "name": "teach",
+      "category": "productivity",
+      "description": "Teach the user a new skill or concept, within this workspace.",
+      "sourcePath": "skills/productivity/teach",
+      "files": {
+        "agents/openai.yaml": "5856f3ae8aec742f1499c640aecdd5f1d6af5fa210a7c6ec794de8263a6f733f",
+        "GLOSSARY-FORMAT.md": "d177def491519d97873291f2e860d8f1d60ead78feecb82eee022177958069c6",
+        "LEARNING-RECORD-FORMAT.md": "855f81017625256584bbf62bd5edb9b0c86605c4cc1139c56acc36b802595d17",
+        "MISSION-FORMAT.md": "8da6d3ac84eb2eb19f17c260b6acf01c560d3ac7a4501c415eea0e985602f4d7",
+        "RESOURCES-FORMAT.md": "2bc634a64b0d0daa10904f9222e7aa0d361420dfacabbf092fbe3a72222edc08",
+        "SKILL.md": "55efdc7f487a76626b2c663fdc45457625135aacf2613c659675c05f4aae3c3b"
+      }
+    },
+    {
+      "name": "to-questionnaire",
+      "category": "productivity",
+      "description": "Turn a decision you can't fully answer into a questionnaire for someone else to fill in.",
+      "sourcePath": "skills/productivity/to-questionnaire",
+      "files": {
+        "agents/openai.yaml": "9e8a06c38c8842eea8d4922cb9d1ead8e3ace647bab259b943c994a1b4742bc2",
+        "SKILL.md": "e24426d2194326d55e7cb6cd53113163ee815e4e98c5cebff57b859fa9b92709"
+      }
+    },
+    {
+      "name": "to-spec",
+      "category": "engineering",
+      "description": "Turn the current conversation into a spec and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed.",
+      "sourcePath": "skills/engineering/to-spec",
+      "files": {
+        "agents/openai.yaml": "1c5b4d1e3d8e52287ef19cc2742fdbbfae1914ac75d33af3e4c8174f08cc55bb",
+        "SKILL.md": "5633ce2fc890fe4d332b5212e920458a39cbf64d99f8d4f0a156b0d5d1c07eca"
+      }
+    },
+    {
+      "name": "to-tickets",
+      "category": "engineering",
+      "description": "Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally, or native blocking links on a real tracker.",
+      "sourcePath": "skills/engineering/to-tickets",
+      "files": {
+        "agents/openai.yaml": "21bc6215fffcd7614e9f772bb1760e87cc5fc7dcc707e7d282bc9414267a6090",
+        "SKILL.md": "8aa60bac964ef41d80dea109d2b633dd753c5c254d6515750da8b2ae9984c963"
+      }
+    },
+    {
+      "name": "triage",
+      "category": "engineering",
+      "description": "Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs.",
+      "sourcePath": "skills/engineering/triage",
+      "files": {
+        "AGENT-BRIEF.md": "5b78d347cc53f6bcf7b875106005ccf5315055fa4cf75eb28d41e96ee426d27b",
+        "agents/openai.yaml": "2e683717720cf456d165d0bb1a68bb600d0b6a8ccb61841c172e50d26f95351c",
+        "OUT-OF-SCOPE.md": "2526f998fd7ca5e956d3f6f234bcc2431a5971ee769f1148ddc60b92f04d5914",
+        "SKILL.md": "1b34d31b072590952c596afb93789c43ac393348c2bd2d3442759720a3d4765c"
+      }
+    },
+    {
+      "name": "wait-what",
+      "category": "productivity",
+      "description": "Stop. That last message did not land — re-pitch it.",
+      "sourcePath": "skills/productivity/wait-what",
+      "files": {
+        "agents/openai.yaml": "3ec661af8fc7063b650518c95ab775bbeabaefce38b89acaf6da2f749168f37e",
+        "SKILL.md": "bdc56d3fbd17bad61f58a2e9cd47e91e3acbd9130ade42cdf2ffde336ef0db79"
+      }
+    },
+    {
+      "name": "wayfinder",
+      "category": "engineering",
+      "description": "Plan a huge chunk of work — more than one agent session can hold — as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear.",
+      "sourcePath": "skills/engineering/wayfinder",
+      "files": {
+        "agents/openai.yaml": "88bc81a11a6d52ac67aeaa76b8b619e387020d47c5133a4dd4927fd15c4ad073",
+        "SKILL.md": "1aaa9a5b3a22a4a47cb2daff719f3195d52354006eb5ce4c64afef51eefa7b12"
+      }
+    },
+    {
+      "name": "wizard",
+      "category": "engineering",
+      "description": "Generate an interactive bash wizard that walks a human through steps only they can perform. Use when provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover. Don't invoke this for steps the agent can perform itself.",
+      "sourcePath": "skills/engineering/wizard",
+      "files": {
+        "agents/openai.yaml": "98f44d682d58e262f160dc59a8befc365e0aa65820dd0261864af26aa8e59d83",
+        "SKILL.md": "7fb2b4ba23870ec028c85c6d7ef1ca573413ca7026bd4d410fe0e6d8dc9d1e92",
+        "template.sh": "d43dc3f7b6008779ef55e3935bf1df246b5bc194b7f9e1dee3d9340a00922ce6"
+      }
+    },
+    {
+      "name": "writing-for-agents",
+      "category": "productivity",
+      "description": "Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md.",
+      "sourcePath": "skills/productivity/writing-for-agents",
+      "files": {
+        "agents/openai.yaml": "eacb24b2a618cfb81dacb0416f4fdd75ddf3a8060f8ddb99aae1b1e301907e4b",
+        "SKILL-MECHANICS.md": "b49091d76f962d74106cf1573f7763532cee002633e3dbfb92a53339ebfc2925",
+        "SKILL.md": "a842323e664e5af104eac5c97ad22fda929ebeb62d81c501161ac1f6f482db58"
+      }
+    },
+    {
+      "name": "youtube-action-plan",
+      "category": "productivity",
+      "description": "Turn a YouTube video, transcript, or reliable summary into a small application plan with evidence, actions, and a review point. Use when a user wants to apply a video's useful ideas, separate insight from entertainment, or convert passive notes into a bounded experiment.",
+      "sourcePath": "skills/productivity/youtube-action-plan",
+      "files": {
+        "agents/openai.yaml": "08ad0bc85fa9ad425afd8f31e480c56dc46122993958b5e009c12804b8f7cacd",
+        "SKILL.md": "42e868688237685ed6ec685db70a11c27c08b5d4240bf5305b73f177f7cf7a7e"
+      }
+    }
+  ],
+  "projectedReceipts": [
+    {
+      "file": "LICENSE",
+      "sha256": "54ba8a14022ba0ccbf8b8fc2e29d76f4cdc689ec8103c5483efc9d74a037bd49"
+    },
+    {
+      "file": "NOTICE.md",
+      "sha256": "4c9c6a0645eb95257a3108eea1080a08a44b45eed7f56ae7cdd4fe50e00ccc7b"
+    },
+    {
+      "file": "THIRD_PARTY_LICENSES/matt-pocock-MIT.txt",
+      "sha256": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5"
+    },
+    {
+      "file": "THIRD_PARTY_NOTICES.md",
+      "sha256": "a8cc836b6f1df21e0debc7e8c13aeb2817e33af63a99eb8cd773b65762257f87"
+    },
+    {
+      "file": "PROVENANCE.json",
+      "sha256": "c426db7a811cc6a5ca3a63a31010fa4062a0ec4f2b3e456f84259ad8f84e1331"
+    },
+    {
+      "file": "SUPPORT.md",
+      "sha256": "2c61b6c919f6988d5e8a85979c5205ade707369142ba9749c176d2ccf9c8c216"
+    },
+    {
+      "file": "SECURITY.md",
+      "sha256": "872a2a12b7cdbe7a2032636b8225a6a0cfe063cc9d2b334a6c139ec1ee7a0954"
+    }
+  ],
+  "projectionDigest": "094cce709f43dfedc9828265b890829dfd572e6742c25efe2cab0d27a12f95d1"
+}

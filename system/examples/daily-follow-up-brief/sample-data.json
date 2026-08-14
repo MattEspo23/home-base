@@ -1,0 +1,48 @@
+{
+  "asOf": "2026-07-26T14:00:00.000Z",
+  "inbox": [
+    {
+      "id": "message-001",
+      "contactLabel": "Demo Contact A",
+      "subject": "Estimate question",
+      "receivedAt": "2026-07-25T15:30:00.000Z",
+      "status": "needs_reply",
+      "urgency": "high",
+      "nextStep": "Answer the open estimate question"
+    },
+    {
+      "id": "message-002",
+      "contactLabel": "Demo Contact B",
+      "subject": "Confirm next meeting",
+      "receivedAt": "2026-07-26T09:15:00.000Z",
+      "status": "needs_reply",
+      "urgency": "normal",
+      "nextStep": "Confirm the proposed time"
+    },
+    {
+      "id": "message-003",
+      "contactLabel": "Demo Contact C",
+      "subject": "Reference material received",
+      "receivedAt": "2026-07-24T18:00:00.000Z",
+      "status": "complete",
+      "urgency": "normal",
+      "nextStep": "None"
+    }
+  ],
+  "calendar": [
+    {
+      "id": "event-001",
+      "contactLabel": "Demo Contact B",
+      "title": "Discovery call",
+      "start": "2026-07-27T16:00:00.000Z",
+      "status": "scheduled"
+    },
+    {
+      "id": "event-002",
+      "contactLabel": "Demo Contact D",
+      "title": "Project review",
+      "start": "2026-07-29T15:00:00.000Z",
+      "status": "scheduled"
+    }
+  ]
+}

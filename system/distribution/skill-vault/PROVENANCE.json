@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "collection": {
+    "name": "EspoAI Skill Vault",
+    "version": "0.1.3",
+    "copyrightHolder": "Matthew Esposito",
+    "license": "MIT"
+  },
+  "upstream": {
+    "repository": "https://github.com/mattpocock/skills",
+    "release": "v1.2.3",
+    "commit": "6acc160e4e0cd062dbbbd7a1b26ae92855edf07e",
+    "license": "MIT",
+    "licenseFile": "THIRD_PARTY_LICENSES/matt-pocock-MIT.txt"
+  },
+  "packages": [
+    {
+      "path": "skills/engineering/ask-espo",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/ask-matt"
+    },
+    {
+      "path": "skills/engineering/code-review",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/code-review"
+    },
+    {
+      "path": "skills/engineering/codebase-design",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/codebase-design"
+    },
+    {
+      "path": "skills/engineering/diagnosing-bugs",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/diagnosing-bugs"
+    },
+    {
+      "path": "skills/engineering/domain-modeling",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/domain-modeling"
+    },
+    {
+      "path": "skills/engineering/grill-with-docs",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/grill-with-docs"
+    },
+    {
+      "path": "skills/engineering/implement",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/implement"
+    },
+    {
+      "path": "skills/engineering/improve-codebase-architecture",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/improve-codebase-architecture"
+    },
+    {
+      "path": "skills/engineering/prototype",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/prototype"
+    },
+    {
+      "path": "skills/engineering/research",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/research"
+    },
+    {
+      "path": "skills/engineering/resolving-merge-conflicts",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/resolving-merge-conflicts"
+    },
+    {
+      "path": "skills/engineering/setup-espo-skills",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/setup-matt-pocock-skills"
+    },
+    {
+      "path": "skills/engineering/tdd",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/tdd"
+    },
+    {
+      "path": "skills/engineering/to-spec",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/to-spec"
+    },
+    {
+      "path": "skills/engineering/to-tickets",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/to-tickets"
+    },
+    {
+      "path": "skills/engineering/triage",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/triage"
+    },
+    {
+      "path": "skills/engineering/wayfinder",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/wayfinder"
+    },
+    {
+      "path": "skills/engineering/wizard",
+      "origin": "adapted",
+      "upstreamPath": "skills/engineering/wizard"
+    },
+    {
+      "path": "skills/productivity/grill-me",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/grill-me"
+    },
+    {
+      "path": "skills/productivity/grilling",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/grilling"
+    },
+    {
+      "path": "skills/productivity/handoff",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/handoff"
+    },
+    {
+      "path": "skills/productivity/teach",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/teach"
+    },
+    {
+      "path": "skills/productivity/to-questionnaire",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/to-questionnaire"
+    },
+    {
+      "path": "skills/productivity/wait-what",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/wait-what"
+    },
+    {
+      "path": "skills/productivity/writing-for-agents",
+      "origin": "adapted",
+      "upstreamPath": "skills/productivity/writing-for-agents"
+    },
+    {
+      "path": "skills/engineering/semantic-tree",
+      "origin": "original",
+      "copyrightHolder": "Matthew Esposito",
+      "license": "MIT"
+    },
+    {
+      "path": "skills/productivity/youtube-action-plan",
+      "origin": "original",
+      "copyrightHolder": "Matthew Esposito",
+      "license": "MIT"
+    }
+  ]
+}
