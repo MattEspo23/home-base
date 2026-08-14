@@ -82,8 +82,11 @@ if (publicRelease) {
     throw new Error(`Public package filename must be home-base-${manifest.version}.tgz`)
   }
 }
-const sourceRef = publicRelease ? exactTag : (branchRef || exactTag)
-if (!sourceRef) throw new Error('Packaging requires a named branch or exact tag source ref')
+// Pull-request CI checks out a detached merge commit. Candidate packages are
+// never CTA-eligible, so the immutable commit is the truthful fallback source
+// ref when no branch or exact tag is available. Public packages still require
+// the exact release tag above.
+const sourceRef = publicRelease ? exactTag : (branchRef || exactTag || sourceCommit)
 const source = normalizedRepository
   ? {
       kind: 'github_remote',
