@@ -157,14 +157,10 @@ node system/update.mjs rollback \
 Rollback itself writes a recovery marker, so an interrupted rollback can be
 completed from the same checkpoint.
 
-Until a separately approved public release exists, Home Base must not invent a
-download URL, run `git pull`, fetch a mutable branch, or claim that “update” can
-retrieve a public artifact. The current private release-candidate archive and
-checksum support internal proof only.
-
-When public release metadata exists, `system/retrieve-release.mjs` may inspect a
-mutable discovery pointer, but it downloads only an immutable tag-bound GitHub
-release asset with a full commit, declared byte size, and SHA-256. It permits
+Home Base must never invent a download URL, run `git pull`, or fetch a mutable
+branch as an update. `system/retrieve-release.mjs` may inspect the public stable
+discovery pointer, but it downloads only an immutable tag-bound GitHub release
+asset with a full commit, declared byte size, and SHA-256. It permits
 only the exact `MattEspo23/home-base` GitHub trust root, bounded redirects,
 bytes, and time. It hashes before extraction, preflights every tar header in
 temporary storage, and rejects traversal, path collisions, links, devices,

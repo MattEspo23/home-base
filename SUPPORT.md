@@ -20,8 +20,8 @@ there is no SLA and no promised response or repair time.
   toolchains. Unverified does not mean known-broken.
 
 Start with `system/inspect-runtime.mjs`, `system/validate.mjs`, and the relevant
-guide. Use the structured bug form for a sanitized reproduction. Once GitHub
-Discussions is separately enabled, use it for questions and workflow ideas.
+guide. Use the structured bug form for a sanitized reproduction. Use GitHub
+Discussions for questions and workflow ideas.
 
 Never post credentials, client data, proprietary repository contents, private
 prompts, or unredacted diagnostic output. Use [`SECURITY.md`](./SECURITY.md)

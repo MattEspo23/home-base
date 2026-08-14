@@ -1,7 +1,6 @@
-# Home Base 1.0 release candidate
+# Home Base 1.0
 
-Version `1.0.0-rc.5` is a private distribution proof. It is not approved for
-public release, deployment, or website activation.
+Version `1.0.0` is the first public stable Home Base release.
 
 ## Distribution additions
 
@@ -58,7 +57,7 @@ idempotently recoverable; checkpoint tampering stops recovery.
 - Pristine starter-source packaging that cannot copy personalized user files
   into another person’s archive
 
-## Private proof commands
+## Release proof commands
 
 From the `home-base/` folder:
 
@@ -71,19 +70,18 @@ node system/test-release-retrieval.mjs
 node system/inspect-runtime.mjs
 ```
 
-After committing a clean Home Base tree, create and re-extract an internal
-release-candidate archive with adjacent checksum and metadata receipts:
+After tagging the exact clean Home Base source commit `v1.0.0`, create and
+re-extract the public archive with adjacent checksum and metadata receipts:
 
 ```bash
-node system/package.mjs --output /tmp/home-base-1.0.0-rc.5.tgz
+node system/package.mjs --public-release --output /tmp/home-base-1.0.0.tgz
 ```
 
 The command refuses an uncommitted Home Base tree.
 
-## Still gated
+## Durable safety boundary
 
-A public standalone Home Base repository, public artifact URL, website download
-button, branch-policy change, unaffiliated-machine public download, external
-account connection, deployment, filming, publication, scheduling, and release
-announcement remain separately gated. This RC proves internal packaging and
-update behavior without claiming those actions occurred.
+The public release does not authorize external account connection, sends,
+publishing, spending, deployment, or future update application. Home Base must
+still preview those actions, prove exact authority, and obtain the user's
+approval at the moment of action.

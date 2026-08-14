@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": {
     "name": "EspoAI Home Base",
-    "version": "1.0.0-rc.5",
+    "version": "1.0.0",
     "copyrightHolder": "Matthew Esposito",
     "license": "MIT"
   },

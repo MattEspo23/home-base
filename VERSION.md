@@ -1,7 +1,7 @@
 # Home Base version
 
-- Version: `1.0.0-rc.5`
-- Status: private release candidate; not approved for public release
+- Version: `1.0.0`
+- Status: public stable release
 - Updated: 2026-08-13
 
 ## Version-one support
@@ -21,7 +21,7 @@
 - Visible suggestion budgeting, durable decline, and two-run learning proof
 - Conversation-first SOP discovery, skill building, safe connection planning,
   update review, and learning closeout
-- A pinned 40-Skill bundle (13 Home Base core + 27 Skill Vault 0.1.3 candidate)
+- A pinned 40-Skill bundle (13 Home Base core + 27 released Skill Vault 0.1.3 packages)
   with matching Codex and Claude adapters, file hashes, and exact provenance
 - Root MIT licensing, byte-verbatim third-party notices, protected brand/identity
   boundaries, latest-stable best-effort support, and private security routing
@@ -33,9 +33,9 @@
 - Beginner installation guidance and a durable preference read in the
   executable two-run learning reference
 
-## Public release gate
+## Release boundary
 
-No public repository, download, external deployment, release, or announcement
-has been approved. Public release still requires the complete clean-copy proof
-suite, authenticated named-assistant proof, privacy/security review, uncoached
-keeper run, final naming/license/support, and Matt’s explicit approval.
+The official `v1.0.0` GitHub release is the immutable distribution source.
+Skills and local workflows never grant account access or permission for an
+external action. Connections, sends, publishing, spending, deployment, and
+future updates still require their own explicit review and approval.

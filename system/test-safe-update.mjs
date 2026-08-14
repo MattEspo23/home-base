@@ -230,6 +230,7 @@ try {
       const attackManifest = manifest('5.1.0')
       attackManifest.maintainedPaths.push('Managed')
       write(attackIncoming, 'system/release-manifest.json', `${JSON.stringify(attackManifest, null, 2)}\n`)
+      write(attackIncoming, 'Managed/collision.md', 'case-collision fixture\n')
     }
     if (attack === 'unicode') {
       const attackManifest = manifest('5.1.0')
