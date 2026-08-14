@@ -11,6 +11,7 @@ import {
   discoverChannel,
   extractVerifiedArchive,
   inspectTar,
+  retrievalRequestHeaders,
   validateRedirect,
   validateChannelPointer,
   validateReleaseMetadata,
@@ -101,6 +102,18 @@ test('rejects mutable or mismatched release identity', () => {
 test('rejects foreign hosts and excessive redirects', () => {
   assert.throws(() => validateRetrievalUrl('https://example.com/file.tgz'), /not allowlisted/)
   assert.throws(() => validateRedirect('https://github.com/MattEspo23/home-base/releases/download/v1.0.0/file.tgz', 'https://objects.githubusercontent.com/file', 4), /redirect limit/)
+})
+
+test('uses GitHub API media headers only for API requests', () => {
+  assert.deepEqual(retrievalRequestHeaders('https://api.github.com/repos/MattEspo23/home-base/contents/channels/stable.json?ref=main'), {
+    'user-agent': 'EspoAI-Home-Base/1.0',
+    accept: 'application/vnd.github+json',
+    'x-github-api-version': '2022-11-28',
+  })
+  assert.deepEqual(retrievalRequestHeaders('https://github.com/MattEspo23/home-base/releases/download/v1.0.0/file.tgz'), {
+    'user-agent': 'EspoAI-Home-Base/1.0',
+    accept: 'application/octet-stream',
+  })
 })
 
 test('mutable channel discovery resolves only immutable matching metadata', async () => {

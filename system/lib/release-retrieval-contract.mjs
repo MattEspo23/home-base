@@ -94,7 +94,7 @@ function requestBuffer(url, { maxBytes, deadline, redirectCount = 0, headers = {
     const remaining = deadline - Date.now()
     if (remaining <= 0) return reject(new Error('Release retrieval exceeded the total timeout'))
     const timer = setTimeout(() => request.destroy(new Error('Release retrieval exceeded the total timeout')), remaining)
-    const request = https.get(url, { headers: { 'user-agent': 'EspoAI-Home-Base/1.0', accept: 'application/octet-stream', ...headers } }, (response) => {
+    const request = https.get(url, { headers: retrievalRequestHeaders(url, headers) }, (response) => {
       const status = response.statusCode ?? 0
       if (status >= 300 && status < 400 && response.headers.location) {
         response.resume()
@@ -157,6 +157,21 @@ function requestBuffer(url, { maxBytes, deadline, redirectCount = 0, headers = {
       }
     })
   })
+}
+
+export function retrievalRequestHeaders(url, overrides = {}) {
+  const parsed = normalizedUrl(url)
+  const apiHeaders = parsed.hostname === 'api.github.com'
+    ? {
+        accept: 'application/vnd.github+json',
+        'x-github-api-version': '2022-11-28',
+      }
+    : { accept: 'application/octet-stream' }
+  return {
+    'user-agent': 'EspoAI-Home-Base/1.0',
+    ...apiHeaders,
+    ...overrides,
+  }
 }
 
 export async function fetchJson(url, maxBytes = 1024 * 1024) {
