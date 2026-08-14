@@ -84,7 +84,7 @@ If you are not sure what an SOP or skill should be, read [SOP-STARTER.md](SOP-ST
 
 ## Works with more than one agent
 
-This private Home Base 1.0 release candidate is set up and statically checked
+Home Base 1.0 is set up and statically checked
 for:
 
 - Codex, through `AGENTS.md` and `.agents/skills/`
@@ -116,9 +116,9 @@ preview/prepare/approve/apply/recover/rollback process is documented in
 [system/UPDATE-GUIDE.md](system/UPDATE-GUIDE.md). Replacing the whole folder is
 not a safe update method.
 
-This repository copy is still a private release candidate. Its archive and
-checksum can be proven internally, but no public Home Base download or website
-activation is claimed until the separate public release gate is approved.
+The official `v1.0.0` GitHub release provides the immutable Home Base archive,
+adjacent SHA-256 receipt, and machine-readable release metadata. Use those
+release assets rather than downloading a mutable branch snapshot.
 
 Home Base is MIT-licensed for editing and reuse. Third-party provenance,
 brand/identity boundaries, best-effort support, and private security guidance
