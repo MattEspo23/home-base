@@ -1,6 +1,6 @@
 # Home Base version
 
-- Version: `1.0.0`
+- Version: `1.0.1`
 - Status: public stable release
 - Updated: 2026-08-13
 
@@ -35,7 +35,9 @@
 
 ## Release boundary
 
-The official `v1.0.0` GitHub release is the immutable distribution source.
+The official `v1.0.1` GitHub release is the current immutable distribution
+source. It repairs unauthenticated GitHub API retrieval discovered by the first
+public keeper; the `v1.0.0` tag and release remain unchanged as history.
 Skills and local workflows never grant account access or permission for an
 external action. Connections, sends, publishing, spending, deployment, and
 future updates still require their own explicit review and approval.

@@ -1,4 +1,11 @@
-# Home Base 1.0
+# Home Base 1.0.1
+
+Version `1.0.1` is the current public stable Home Base release. It fixes the
+unauthenticated stable-channel keeper by sending GitHub's JSON media type and
+API version headers to API endpoints while retaining octet-stream retrieval for
+release assets. The public `v1.0.0` tag and release remain immutable.
+
+## Home Base 1.0 foundation
 
 Version `1.0.0` is the first public stable Home Base release.
 
@@ -70,11 +77,11 @@ node system/test-release-retrieval.mjs
 node system/inspect-runtime.mjs
 ```
 
-After tagging the exact clean Home Base source commit `v1.0.0`, create and
+After tagging the exact clean Home Base source commit `v1.0.1`, create and
 re-extract the public archive with adjacent checksum and metadata receipts:
 
 ```bash
-node system/package.mjs --public-release --output /tmp/home-base-1.0.0.tgz
+node system/package.mjs --public-release --output /tmp/home-base-1.0.1.tgz
 ```
 
 The command refuses an uncommitted Home Base tree.

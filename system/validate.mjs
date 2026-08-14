@@ -371,7 +371,7 @@ if (scenarioContract) {
 }
 
 const version = read('VERSION.md')
-if (!version.includes('1.0.0') || !version.includes('public stable release')) {
+if (!version.includes('1.0.1') || !version.includes('public stable release')) {
   fail('VERSION.md must identify the public stable Home Base 1.0 release')
 } else {
   pass('Version metadata identifies public stable Home Base 1.0')
@@ -396,8 +396,8 @@ if (releaseManifest) {
   )
   if (
     releaseManifest.schemaVersion !== 2 ||
-    releaseManifest.releaseId !== 'home-base-1.0.0' ||
-    releaseManifest.version !== '1.0.0' ||
+    releaseManifest.releaseId !== 'home-base-1.0.1' ||
+    releaseManifest.version !== '1.0.1' ||
     releaseManifest.starterSourceRoot !== 'system/starter' ||
     overlap.length > 0 ||
     !userOwned.includes('you') ||
@@ -451,7 +451,7 @@ try {
   if (
     !license.includes('Copyright (c) 2026 Matthew Esposito') ||
     upstreamHash !== '0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5' ||
-    provenance.product?.version !== '1.0.0' ||
+    provenance.product?.version !== '1.0.1' ||
     provenance.homeBaseCoreSkills?.length !== 13 ||
     provenance.skillVault?.commit !== skillLock.source?.commit ||
     provenance.skillVault?.projectionDigest !== skillLock.projectionDigest
@@ -499,12 +499,12 @@ try {
     previewChannel.channel !== 'preview' ||
     stableChannel.state !== 'available' ||
     previewChannel.state !== 'unavailable' ||
-    stableChannel.metadataUrl !== 'https://github.com/MattEspo23/home-base/releases/download/v1.0.0/home-base-1.0.0.tgz.json' ||
+    stableChannel.metadataUrl !== 'https://github.com/MattEspo23/home-base/releases/download/v1.0.1/home-base-1.0.1.tgz.json' ||
     previewChannel.metadataUrl !== null
   ) {
     fail('Stable release discovery must be immutable while preview fails closed')
   } else {
-    pass('Stable discovery points to v1.0.0 metadata and preview fails closed')
+    pass('Stable discovery points to v1.0.1 metadata and preview fails closed')
   }
 } catch (error) {
   fail(`Update channel contract is invalid: ${error.message}`)

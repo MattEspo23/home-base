@@ -116,7 +116,7 @@ preview/prepare/approve/apply/recover/rollback process is documented in
 [system/UPDATE-GUIDE.md](system/UPDATE-GUIDE.md). Replacing the whole folder is
 not a safe update method.
 
-The official `v1.0.0` GitHub release provides the immutable Home Base archive,
+The official `v1.0.1` GitHub release provides the current immutable Home Base archive,
 adjacent SHA-256 receipt, and machine-readable release metadata. Use those
 release assets rather than downloading a mutable branch snapshot.
 
