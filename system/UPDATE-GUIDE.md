@@ -281,19 +281,22 @@ nothing. It only clears the unfinished update, removes
 holds copies of your own files. It never writes your own folders or
 `instance/`, so it adds no entry to `memory/UPDATE-HISTORY.md`.
 
-If any maintained file matches neither, it lists those files, stops, and
-changes nothing. This happens in two cases:
+If the 1.0.x updater was stopped while it was putting your files back (for
+example, the computer shut down), some maintained files or whole folders are
+missing, sometimes even `system/`, so the 1.0.x updater itself is gone. The
+same command handles that too: it checks the saved copy against its recorded
+fingerprints, puts back only the maintained folders and files from it,
+confirms every fingerprint, and then clears the unfinished update as above.
+Your own folders and `instance/` are never touched.
 
-- **A file was edited after the failed update.** Move any edits you want to
-  keep somewhere else, put the files back as they were, and run the same
-  command again.
-- **The 1.0.x updater was stopped while it was putting your files back** (for
-  example, the computer shut down), so some files are still the newer
-  release’s. Run the 1.0.x updater’s own recover once, from your Home Base
-  folder: `node system/update.mjs recover`. It finishes copying the saved
-  files back, then stops with the same “personalized files” message as
-  before; that is expected. Then run the command above again, and it
-  completes.
+It refuses, lists the files, and changes nothing in two cases:
+
+- **A maintained file was edited after the failed update** (it is present but
+  matches neither saved copy). Move any edits you want to keep somewhere
+  else, put the files back as they were, and run the same command again.
+- **The saved copy is missing or damaged**, so it cannot be checked or put
+  back. Ask for help through [`SUPPORT.md`](../SUPPORT.md) before changing
+  anything.
 
 You can then update normally.
 

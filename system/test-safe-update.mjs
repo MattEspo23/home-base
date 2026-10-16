@@ -853,6 +853,43 @@ try {
   assert.equal(fs.readFileSync(path.join(stuckLegacy.stuck, 'managed', 'skill.md'), 'utf8'), 'top\nincoming-one\nlocal edit before the update\nbottom\n')
   pass('an install stuck by a 1.0.x updater is repaired by recover only when every maintained file matches the checkpoint or base, without restoring or touching user-owned or instance files; a hand-edited or leftover file is refused with nothing changed')
 
+  // A 1.0.x restore that was itself cut off: 1.0.x deletes every maintained
+  // root first, then copies them back one by one, so a kill leaves whole roots
+  // (system/ included) or some of their files missing. The repair puts back
+  // only the maintained roots from the verified checkpoint, confirms every
+  // hash, and clears the update; user-owned and instance files are untouched.
+  const cut = makeLegacyStuck('legacy-cut', 'b')
+  const cutInstance = treeDigest(path.join(cut.stuck, 'instance'))
+  const cutUser = treeDigest(path.join(cut.stuck, 'user'))
+  const cutMemory = treeDigest(path.join(cut.stuck, 'memory'))
+  const cutManaged = treeDigest(path.join(cut.stuck, 'managed'))
+  const cutSystem = treeDigest(path.join(cut.stuck, 'system'))
+  fs.rmSync(path.join(cut.stuck, 'system'), { recursive: true })
+  fs.rmSync(path.join(cut.stuck, 'managed', 'skill.md'))
+  const cutRepaired = recoverUpdate(cut.stuck, { validateRestored: () => { throw new Error('the legacy repair is confirmed by hashes, not a validator') } })
+  assert.deepEqual(cutRepaired, { recovered: true, action: 'legacy_checkpoint_restored' })
+  assert.equal(treeDigest(path.join(cut.stuck, 'system')), cutSystem, 'system/ is back exactly as saved')
+  assert.equal(treeDigest(path.join(cut.stuck, 'managed')), cutManaged, 'managed/ is back exactly as saved')
+  assert.equal(stateOf(cut.stuck).activeTransactionId, null)
+  assert.equal(fs.existsSync(path.join(cut.stuck, '.home-base', 'state', 'recovery.json')), false)
+  assert.equal(treeDigest(path.join(cut.stuck, 'instance')), cutInstance)
+  assert.equal(treeDigest(path.join(cut.stuck, 'user')), cutUser)
+  assert.equal(treeDigest(path.join(cut.stuck, 'memory')), cutMemory)
+  assertNoPrivateCopies(cut.stuck, 'after repairing a cut-off legacy restore')
+  applyFixture(cut.stuck, cut.incoming)
+  assert.equal(versionOf(cut.stuck), '22.1.0')
+
+  // A saved copy that is damaged cannot be put back: a plain refusal, nothing changed.
+  const damaged = makeLegacyStuck('legacy-damaged', 'c')
+  fs.rmSync(path.join(damaged.stuck, 'system'), { recursive: true })
+  const damagedCheckpointFile = path.join(damaged.stuck, '.home-base', 'state', 'transactions', damaged.transactionId, 'checkpoint', 'tree', 'managed', 'skill.md')
+  fs.chmodSync(damagedCheckpointFile, 0o600)
+  fs.writeFileSync(damagedCheckpointFile, 'tampered\n')
+  const damagedBefore = treeDigest(damaged.stuck)
+  assert.throws(() => recoverUpdate(damaged.stuck, {}), /^Error: Recovery refused: the copy of your Home Base files saved before the update is missing or damaged, so it cannot be checked or put back\. Nothing was changed\.$/)
+  assert.equal(treeDigest(damaged.stuck), damagedBefore, 'nothing was changed')
+  pass('a 1.0.x restore cut off with system/ and maintained files missing is finished from the verified checkpoint (maintained roots only, every hash confirmed); a damaged checkpoint is refused plainly with nothing changed')
+
   // init takes the update lock, so it cannot sweep staging under a live apply.
   const initLockCurrent = path.join(fixtureRoot, 'init-lock-current')
   createRelease(initLockCurrent, '19.0.0', '8')

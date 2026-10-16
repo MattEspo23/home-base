@@ -487,22 +487,26 @@ try {
   check(refusedRepair.status !== 0 && /Recovery refused: .*START-HERE\.md.*Nothing was changed/s.test(refusedRepair.out) && treeHash(edited) === editedBefore,
     'repair refuses, changing nothing (hidden state included), when a maintained file matches neither the checkpoint nor the 1.0.1 base', refusedRepair.out)
 
-  // A 1.0.x restore that was itself cut off leaves some files at the newer
-  // release. The documented way out: the 1.0.x recover once (it finishes the
-  // copy, then its proof refuses again), then the repair.
+  // A 1.0.x restore that was itself cut off. The 1.0.1 restore deletes every
+  // maintained root first, then copies them back in localeCompare order, so a
+  // kill before system/ was copied leaves system/ and every later root
+  // missing; there is no system/update.mjs left to run. The new release's
+  // repair puts back only the maintained roots from the verified checkpoint.
   const interrupted = path.join(base, 'stuck-interrupted', 'home-base')
   fs.mkdirSync(path.dirname(interrupted), { recursive: true })
   run('cp', ['-RP', stuck, interrupted])
-  fs.copyFileSync(path.join(dev1Candidate, 'VERSION.md'), path.join(interrupted, 'VERSION.md'))
-  const interruptedRefusal = hb(dev1Candidate, ['recover', '--root', interrupted])
-  check(interruptedRefusal.status !== 0 && /VERSION\.md/.test(interruptedRefusal.out) && /run its own `node system\/update\.mjs recover` once first/.test(interruptedRefusal.out),
-    'repair refuses a half-finished 1.0.x restore and names the way out', interruptedRefusal.out)
-  const oldFinish = hb(interrupted, ['recover'])
-  check(oldFinish.status !== 0 && /personalized files outside the starter manifest/.test(oldFinish.out) && version(interrupted) === '1.0.1',
-    'the 1.0.1 recover finishes copying the saved files back, then stops with its proof error as documented', oldFinish.out)
+  const interruptedMaintained = treeHash(path.join(interrupted, 'system'))
+  const legacyManifest = JSON.parse(fs.readFileSync(path.join(interrupted, 'system', 'release-manifest.json'), 'utf8'))
+  const restoreOrder = [...legacyManifest.maintainedPaths].sort((left, right) => left.localeCompare(right))
+  const cutAt = restoreOrder.indexOf('system')
+  for (const maintained of restoreOrder.slice(cutAt)) fs.rmSync(path.join(interrupted, maintained), { recursive: true, force: true })
+  check(!fs.existsSync(path.join(interrupted, 'system')) && cutAt > 0, `simulated a 1.0.1 restore killed before system/: ${restoreOrder.length - cutAt} of ${restoreOrder.length} maintained roots missing`)
   const interruptedRepair = hb(dev1Candidate, ['recover', '--root', interrupted])
-  check(interruptedRepair.status === 0 && interruptedRepair.json?.action === 'legacy_restore_verified' && state(interrupted).activeTransactionId === null && userFilesHash(interrupted) === stuckUser,
-    'then the repair completes, user files byte-identical', interruptedRepair.out)
+  check(interruptedRepair.status === 0 && interruptedRepair.json?.action === 'legacy_checkpoint_restored' && state(interrupted).activeTransactionId === null && version(interrupted) === '1.0.1'
+    && treeHash(path.join(interrupted, 'system')) === interruptedMaintained && userFilesHash(interrupted) === stuckUser && clean(hiddenCopies(interrupted)),
+    'the repair puts the missing maintained roots back from the verified checkpoint and clears the update; user files byte-identical, no hidden copies', interruptedRepair.out)
+  const interruptedUpdate = update(interrupted, dev1Candidate)
+  check(interruptedUpdate.status === 0 && version(interrupted) === dev1Version && userFilesHash(interrupted) === stuckUser, `then the 1.0.1 updater installs ${dev1Version} normally`, interruptedUpdate.out)
 
   const repaired = hb(dev1Candidate, ['recover', '--root', stuck])
   check(repaired.status === 0 && repaired.json?.action === 'legacy_restore_verified' && state(stuck).activeTransactionId === null && !fs.existsSync(stuckMarker) && version(stuck) === '1.0.1',

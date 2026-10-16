@@ -343,11 +343,13 @@ function makeSnapshot(root, identity, destination) {
   return snapshot
 }
 
-function loadSnapshot(root, state) {
+// maintainedPaths defaults to the live manifest's; the legacy repair passes
+// the checkpoint's, because the live system/ folder may be missing.
+function loadSnapshot(root, state, maintainedPaths = readManifest(root).manifest.maintainedPaths) {
   const paths = statePaths(root)
   const snapshotRoot = safeJoin(paths.stateRoot, state.baseSnapshot.path)
   const snapshot = JSON.parse(fs.readFileSync(path.join(snapshotRoot, 'snapshot.json'), 'utf8'))
-  const records = scanRoots(path.join(snapshotRoot, 'tree'), readManifest(root).manifest.maintainedPaths)
+  const records = scanRoots(path.join(snapshotRoot, 'tree'), maintainedPaths)
   if (recordsDigest(records) !== snapshot.digest || snapshot.digest !== state.baseSnapshot.digest) {
     throw new Error('The immutable Home Base base snapshot is missing, mutable, or corrupt')
   }
@@ -1047,12 +1049,18 @@ function liveManifestPaths(root) {
 // A 1.0.x updater (its checkpoints record no protectedPaths) that failed after
 // the swap restored its checkpoint, then ran the restored tree's own proof,
 // which refuses any personalized install. The transaction stayed active, and
-// its own recover repeats the same proof forever. Its restore copy had already
-// finished, so this repair restores nothing: every maintained path must
-// already match the checkpoint (restore completed) or the base snapshot of the
-// current release (nothing was swapped). Only then does it clear the
-// transaction. It refuses, changing nothing, if any file matches neither, and
-// it never writes a user-owned path or instance/.
+// its own recover repeats the same proof forever.
+//
+// The repair compares every maintained file with the checkpoint (restore
+// completed) and the base snapshot of the current release (nothing was
+// swapped). If all match, it restores nothing and only clears the
+// transaction. If the 1.0.x restore was itself cut off (it deletes every
+// maintained root first, then copies them back one by one, so files or whole
+// folders, even system/, can be missing), it puts the maintained roots back
+// from the verified checkpoint and confirms every hash first. A file that is
+// present but matches neither, outside a root that is missing files, may hold
+// the user's own edit: then it refuses, changing nothing. It never writes a
+// user-owned path or instance/.
 // An interrupted 1.0.x rollback (the transaction it rolls back is still the
 // latest committed one) takes the ordinary restore path instead.
 function legacyRestoreAwaitingConfirmation(checkpointRoot, receipt, state, plan) {
@@ -1062,20 +1070,43 @@ function legacyRestoreAwaitingConfirmation(checkpointRoot, receipt, state, plan)
   return JSON.parse(fs.readFileSync(checkpointPath, 'utf8')).protectedPaths === undefined
 }
 
+const topLevel = (file) => file.split('/')[0]
+
 function confirmLegacyRestoreInPlace(root, state, plan, checkpointRoot) {
   if (stable(state.currentRelease) !== stable(plan.currentRelease) || stable(state.baseSnapshot) !== stable(plan.baseSnapshot)) {
     throw new Error('Recovery refused: the update state no longer names the release this transaction started from. Nothing was changed.')
   }
-  const verified = verifyCheckpoint(checkpointRoot)
-  const base = loadSnapshot(root, state)
+  let verified
+  let checkpointManifest
+  try {
+    verified = verifyCheckpoint(checkpointRoot)
+    checkpointManifest = readManifest(verified.treeRoot).manifest
+  } catch {
+    throw new Error('Recovery refused: the copy of your Home Base files saved before the update is missing or damaged, so it cannot be checked or put back. Nothing was changed.')
+  }
   const live = liveManifestPaths(root)
+  // Without a readable live system/ folder, the saved release names the
+  // user-owned folders that must never be touched.
+  const userOwned = live.userOwnedPaths.length > 0 ? live.userOwnedPaths : checkpointManifest.userOwnedPaths
+  const guard = protectedNames(userOwned)
+  const base = loadSnapshot(root, state, verified.checkpoint.maintainedPaths)
   const roots = minimalConflictRoots([...verified.checkpoint.maintainedPaths, ...live.maintainedPaths])
   // Only maintained roots are compared: never instance/, runtime state, or a user-owned root.
-  for (const maintained of roots) assertMutableTarget(root, maintained, protectedNames(live.userOwnedPaths))
+  for (const maintained of roots) assertMutableTarget(root, maintained, guard)
   const mismatched = mismatchedPaths(root, roots, [verified.records, base.records])
-  if (mismatched.length > 0) {
-    throw new Error(`Recovery refused: these maintained files match neither the update checkpoint nor the installed ${plan.currentRelease.version} release, so they may hold changes made after the failed update: ${mismatched.slice(0, 20).join(', ')}. Nothing was changed. If you edited them, move any edits you want to keep somewhere else, put the files back as they were, and run recover again. If the 1.0.x updater was stopped while it was putting files back, run its own \`node system/update.mjs recover\` once first (it finishes copying, then reports its proof error), then run this command again. See "An update stuck under 1.0.x" in system/UPDATE-GUIDE.md.`)
+  if (mismatched.length === 0) return { restored: false }
+  const liveRecords = scanRoots(root, roots)
+  const missing = mismatched.filter((file) => !liveRecords.has(file) && (verified.records.has(file) || base.records.has(file)))
+  const incompleteRoots = new Set(missing.map(topLevel))
+  const changed = mismatched.filter((file) => liveRecords.has(file) && !incompleteRoots.has(topLevel(file)))
+  if (changed.length > 0 || missing.length === 0) {
+    const listed = changed.length > 0 ? changed : mismatched
+    throw new Error(`Recovery refused: these maintained files match neither the update checkpoint nor the installed ${plan.currentRelease.version} release, so they may hold changes made after the failed update: ${listed.slice(0, 20).join(', ')}. Nothing was changed. Move any edits you want to keep somewhere else, put the files back as they were, and run recover again. See "An update stuck under 1.0.x" in system/UPDATE-GUIDE.md.`)
   }
+  // The 1.0.x restore stopped part-way. Put back only the maintained roots,
+  // from the verified checkpoint; restoreCheckpoint confirms every hash.
+  restoreCheckpoint(root, checkpointRoot, live.maintainedPaths, { protectedList: guard })
+  return { restored: true }
 }
 
 export function recoverUpdate(root, options = {}) {
@@ -1100,15 +1131,16 @@ export function recoverUpdate(root, options = {}) {
     }
     const checkpointRoot = path.join(txRoot, 'checkpoint')
     if (legacyRestoreAwaitingConfirmation(checkpointRoot, receipt, state, plan)) {
-      // Verify first; nothing below runs unless every maintained file matches.
-      confirmLegacyRestoreInPlace(root, state, plan, checkpointRoot)
+      // Verify first; nothing below runs unless every maintained file matches
+      // (after putting back the roots a cut-off 1.0.x restore left missing).
+      const { restored } = confirmLegacyRestoreInPlace(root, state, plan, checkpointRoot)
       updateState(root, (current) => ({ ...current, activeTransactionId: null }))
-      writeTransaction(root, plan, 'recovered', { recovery: 'legacy_restore_verified_in_place' })
+      writeTransaction(root, plan, 'recovered', { recovery: restored ? 'legacy_restore_completed_from_checkpoint' : 'legacy_restore_verified_in_place' })
       removeJournalOld(root, plan.transactionId)
       if (fs.existsSync(paths.recoveryMarker)) removeExact(paths.recoveryMarker, paths.stateRoot)
       // The 1.0.x staging copy holds copies of the user's own files.
       sweepStaging(root)
-      return { recovered: true, action: 'legacy_restore_verified' }
+      return { recovered: true, action: restored ? 'legacy_checkpoint_restored' : 'legacy_restore_verified' }
     }
     sweepStaging(root)
     // Work from the checkpoint's own path list; the live manifest may be the

@@ -45,10 +45,12 @@ Use it only when `recover` fails with the message above. It first checks that
 every maintained file matches either the copy saved just before the update or
 the release you had installed. Then it clears the unfinished update and
 restores nothing. It never writes your own folders or `instance/`. If any
-maintained file matches neither, it lists those files and changes nothing. If
-the 1.0.x updater was stopped while it was putting your files back, run its
-own `node system/update.mjs recover` once first, then the command above again.
-See [the update guide](./system/UPDATE-GUIDE.md).
+maintained file was edited and matches neither, it lists those files and
+changes nothing. If the 1.0.x updater was stopped while it was putting your
+files back, so maintained files or folders (even `system/`) are missing, the
+same command puts back only those maintained files from the saved copy,
+checks every fingerprint, and then finishes. See
+[the update guide](./system/UPDATE-GUIDE.md).
 
 ## What is new
 
