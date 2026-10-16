@@ -73,9 +73,11 @@ checks every fingerprint, and then finishes. See
   `recovery_required` and the error prints the exact `recover` command, which
   uses the copy of the updater kept with that update. Updates now also work on
   a Home Base you keep in your own Git repository. Images, notes with broken
-  links, and other files in your own folders never stop an update, rollback,
-  or recovery: the validator lists them as notes and applies its release rules
-  to the maintained files only.
+  links, links, and other files in your own folders, or anywhere outside the
+  maintained files (a stray screenshot, an editor's settings folder), never
+  stop an update, rollback, or recovery: the validator lists them as notes,
+  never follows a link, and applies its release rules to the maintained files
+  only.
 - **Which assistants work.** Codex and Claude Code are supported. Grok Build
   CLI was verified to read Home Base on 2026-10-15 in a read-only test; it
   uses the same files and needs no adapter folder. Other assistants are

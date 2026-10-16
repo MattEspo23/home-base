@@ -16,23 +16,29 @@ const checks = []
 const notes = []
 let skillVaultPackageNames = new Set()
 
-// The release rules (no media, valid local links, no credential-shaped text,
-// no source maps, valid setup and skill metadata) block only the maintained
-// release files. The user's own folders are checked too, but a problem there
-// is a note, never a failure: updates, rollbacks, and recovery run this
-// validator (the 1.0.x updater runs it with no flags), and a screenshot or a
-// broken link in the user's notes must never stop them. `--release` makes the
-// notes failures again, for a pristine release tree (package.mjs uses it).
+// The release rules (no media, no links or special files, valid local links,
+// no credential-shaped text, no source maps, valid setup and skill metadata)
+// block only the maintained release files named in the manifest. Everything
+// else in the folder (the user's own folders, and any other file or folder
+// such as a stray screenshot, an editor's settings folder, or a folder an
+// assistant created) is checked too, but a problem there is a note, never a
+// failure: updates, rollbacks, and recovery run this validator (the 1.0.x
+// updater runs it with no flags), and the user's files must never stop them.
+// `--release` makes the notes failures again, for a pristine release tree
+// (package.mjs uses it). Without a readable manifest, everything is strict.
 const releaseMode = process.argv.includes('--release')
 const fold = (name) => name.normalize('NFKC').toLowerCase()
-const userOwnedRoots = (() => {
+const maintainedRoots = (() => {
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(root, 'system', 'release-manifest.json'), 'utf8'))
-    return new Set((manifest.userOwnedPaths ?? []).map(fold))
+    if (!Array.isArray(manifest.maintainedPaths) || manifest.maintainedPaths.length === 0) return null
+    return new Set(manifest.maintainedPaths.map(fold))
   } catch {
-    return new Set()
+    return null
   }
 })()
+// Symbolic links and special files found while walking; never followed or read.
+const oddEntries = new Map()
 
 function pass(message) {
   checks.push(message)
@@ -42,13 +48,18 @@ function fail(message) {
   errors.push(message)
 }
 
-function isUserOwned(relativePath) {
-  return userOwnedRoots.has(fold(relativePath.split('/')[0]))
+// True for a path inside a maintained release root (case-folded, so a case
+// variant such as System/ stays strict).
+function isRelease(relativePath) {
+  return maintainedRoots === null || maintainedRoots.has(fold(relativePath.split('/')[0]))
 }
 
-// A problem in a user-owned file is a note unless --release is given.
+// The user's files: everything outside the maintained release roots.
+const isUsers = (relativePath) => !isRelease(relativePath)
+
+// A problem outside the maintained files is a note unless --release is given.
 function problem(relativePath, message) {
-  if (isUserOwned(relativePath) && !releaseMode) notes.push(message)
+  if (isUsers(relativePath) && !releaseMode) notes.push(message)
   else fail(message)
 }
 
@@ -76,7 +87,15 @@ function walk(directory) {
     if (directory === root && fold(entry.name) === updateInternals.INSTANCE_ROOT) return []
     if (entry.isFile() && entry.name.endsWith('.tgz')) return []
     const entryPath = path.join(directory, entry.name)
-    return entry.isDirectory() ? walk(entryPath) : [entryPath]
+    if (entry.isDirectory()) return walk(entryPath)
+    if (entry.isFile()) {
+      if (fs.lstatSync(entryPath).nlink > 1) oddEntries.set(relative(entryPath), 'a hard-linked file')
+      return [entryPath]
+    }
+    // A symbolic link (to a file or a folder) or a special file is recorded,
+    // never followed or read.
+    oddEntries.set(relative(entryPath), entry.isSymbolicLink() ? 'a symbolic link' : 'a special file (socket, device, or pipe)')
+    return []
   })
 }
 
@@ -563,18 +582,21 @@ if (
 
 const MEDIA = /\.(?:png|jpe?g|gif|webp|svg|mp3|wav|m4a|mp4|mov)$/i
 const LARGE_USER_FILE = 2 * 1024 * 1024
+// What a 1.0.x validator would refuse is worth listing, because those files
+// must be parked before a rollback to 1.0.x (see system/UPDATE-GUIDE.md).
+const PARK_HINT = 'fine to keep; move it out only before a rollback to 1.0.x'
 const sourceMaps = walk(root).filter((filePath) =>
   filePath.endsWith('.map') ||
   (/\.(?:m?js|css)$/.test(filePath) && /[#@]\s*sourceMappingURL=/.test(fs.readFileSync(filePath, 'utf8'))),
 ).map(relative).filter((file) => file !== 'system/validate.mjs')
-for (const file of sourceMaps.filter(isUserOwned)) problem(file, `${file} is or references a source map (fine in your own folder; it is never packaged)`)
-const releaseSourceMaps = sourceMaps.filter((file) => !isUserOwned(file))
+for (const file of sourceMaps.filter(isUsers)) problem(file, `${file} is or references a source map (${PARK_HINT})`)
+const releaseSourceMaps = sourceMaps.filter(isRelease)
 if (releaseSourceMaps.length > 0) fail(`Release contains source maps or sourceMappingURL comments: ${releaseSourceMaps.join(', ')}`)
 else pass('Release contains no source maps')
 
 const media = walk(root).filter((filePath) => MEDIA.test(filePath)).map(relative)
-for (const file of media.filter(isUserOwned)) problem(file, `${file} is a media file (fine in your own folder; it is never packaged)`)
-const excludedBrandMedia = media.filter((file) => !isUserOwned(file))
+for (const file of media.filter(isUsers)) problem(file, `${file} is a media file (${PARK_HINT})`)
+const excludedBrandMedia = media.filter(isRelease)
 if (excludedBrandMedia.length > 0) {
   fail(`Release contains excluded brand/media files: ${excludedBrandMedia.join(', ')}`)
 } else {
@@ -600,8 +622,24 @@ try {
   fail(`Update channel contract is invalid: ${error.message}`)
 }
 
+for (const [file, kind] of [...oddEntries].sort(([left], [right]) => left.localeCompare(right))) {
+  problem(file, isRelease(file)
+    ? `Release files may not contain symbolic links, hard links, or special files: ${file} is ${kind}`
+    : `${file} is ${kind}${kind === 'a hard-linked file' ? '' : '; Home Base never follows or reads it'} (${PARK_HINT})`)
+}
+
+// Maintained roots are checked strictly. The rest of the folder only adds
+// notes (collisions such as README.md beside Readme.md), unless --release.
+if (!releaseMode && maintainedRoots !== null) {
+  try {
+    updateInternals.scanWholeTree(root)
+  } catch (error) {
+    if (!/symbolic links|special files|hard-linked/.test(error.message)) notes.push(`Outside the maintained files: ${error.message}`)
+  }
+}
 try {
-  updateInternals.scanWholeTree(root)
+  if (releaseMode || maintainedRoots === null) updateInternals.scanWholeTree(root)
+  else updateInternals.scanRoots(root, [...new Set(JSON.parse(fs.readFileSync(path.join(root, 'system', 'release-manifest.json'), 'utf8')).maintainedPaths)])
   pass('Release tree contains no symlinks, hardlinks, special files, or Unicode/case path collisions')
 } catch (error) {
   fail(`Release tree safety check failed: ${error.message}`)
@@ -770,13 +808,13 @@ for (const markdownFile of markdownFiles) {
       continue
     }
     if (path.isAbsolute(target)) {
-      problem(markdownRelative, `${markdownRelative} has a non-portable absolute local link: ${target}`)
+      problem(markdownRelative, `${markdownRelative} has a non-portable absolute local link: ${target}${isUsers(markdownRelative) ? ` (${PARK_HINT})` : ''}`)
       continue
     }
     const targetWithoutAnchor = target.split('#')[0]
     const resolved = path.resolve(path.dirname(markdownFile), targetWithoutAnchor)
     if (!fs.existsSync(resolved)) {
-      problem(markdownRelative, `${markdownRelative} has a broken local link: ${target}`)
+      problem(markdownRelative, `${markdownRelative} has a broken local link: ${target}${isUsers(markdownRelative) ? ` (${PARK_HINT})` : ''}`)
     }
   }
 }
@@ -784,6 +822,15 @@ if (!errors.some((error) => error.includes('broken local link'))) {
   if (!errors.some((error) => error.includes('non-portable absolute local link'))) {
     pass(`${markdownFiles.length} Markdown files have valid portable local links`)
   }
+}
+
+// Binary by its first bytes: a NUL byte, or a PDF, ZIP (office files), gzip,
+// or 7-Zip signature.
+function isBinary(bytes) {
+  const head = bytes.subarray(0, 8192)
+  if (head.includes(0)) return true
+  const signature = head.subarray(0, 6).toString('latin1')
+  return signature.startsWith('%PDF') || signature.startsWith('PK\u0003\u0004') || signature.startsWith('\u001f\u008b') || signature.startsWith('7z\u00bc\u00af')
 }
 
 const credentialScanAllowlist = new Set([
@@ -794,13 +841,27 @@ const credentialScanAllowlist = new Set([
 for (const textFile of walk(root)) {
   const file = relative(textFile)
   if (credentialScanAllowlist.has(file)) continue
-  // The user's own media and large files are not text worth scanning.
-  if (isUserOwned(file) && (MEDIA.test(file) || fs.statSync(textFile).size > LARGE_USER_FILE)) continue
+  if (isUsers(file)) {
+    // The user's media is noted above. Large and binary files are not text
+    // worth scanning, but a 1.0.x validator reads them all, so they are noted.
+    if (MEDIA.test(file)) continue
+    if (fs.statSync(textFile).size > LARGE_USER_FILE) {
+      problem(file, `${file} is larger than 2 MB, so it is not checked for passwords (${PARK_HINT})`)
+      continue
+    }
+    const bytes = fs.readFileSync(textFile)
+    if (isBinary(bytes)) {
+      problem(file, `${file} is a binary file such as a PDF or an archive, so it is not checked for passwords (${PARK_HINT})`)
+      continue
+    }
+    if (containsCredentialShape(bytes.toString('utf8'))) {
+      problem(file, `${file} contains text shaped like a password, key, or token; Home Base should not store secrets, so remove it if it is real (a 1.0.x validator refuses it too)`)
+    }
+    continue
+  }
   const contents = fs.readFileSync(textFile, 'utf8')
   if (containsCredentialShape(contents)) {
-    problem(file, isUserOwned(file)
-      ? `${file} contains text shaped like a password, key, or token; Home Base should not store secrets, so remove it if it is real`
-      : `Release file contains credential-shaped content: ${file}`)
+    fail(`Release file contains credential-shaped content: ${file}`)
   }
 }
 if (!errors.some((error) => error.includes('secret-like'))) {

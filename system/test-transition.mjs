@@ -230,10 +230,15 @@ function personalize(root) {
   git(root, ['commit', '-q', '-m', 'my home base'])
 }
 
-// Every user-owned file except the update history the updater appends to.
+// Every file outside the maintained release roots (user-owned folders and
+// anything else at the top of the folder), except the update history the
+// updater appends to, the user's own .git, Home Base state, and instance/
+// (hashed on its own). Links are recorded as links, never followed.
+const MAINTAINED_ROOTS = new Set(JSON.parse(fs.readFileSync(path.join(homeBaseRoot, 'system', 'release-manifest.json'), 'utf8')).maintainedPaths.map((name) => name.toLowerCase()))
 function userFilesHash(root) {
   const hash = crypto.createHash('sha256')
-  for (const owned of USER_OWNED_ROOTS) {
+  const tops = fs.readdirSync(root).filter((name) => !MAINTAINED_ROOTS.has(name.toLowerCase()) && !['.git', '.home-base', 'instance'].includes(name)).sort()
+  for (const owned of new Set([...USER_OWNED_ROOTS, ...tops])) {
     const visit = (relativePath) => {
       const absolute = path.join(root, relativePath)
       const stat = fs.lstatSync(absolute, { throwIfNoEntry: false })
@@ -273,23 +278,34 @@ function unpark(root, parked) {
   fs.renameSync(parked, path.join(root, 'instance'))
 }
 
-// Files a user may keep that the release rules refuse: a screenshot, a note
-// with a broken link, and fake key-shaped text (assembled at runtime). From 1.1
-// the validator only notes them; 1.0.x validators refuse them anywhere.
+// Files a user may keep that the release rules refuse, in user-owned folders
+// and outside every manifest folder: screenshots (one at the top of the
+// folder), a note with a broken link, fake key-shaped text (assembled at
+// runtime), an editor folder with a source map, a new folder with a broken
+// link, and a link to a folder. From 1.1 the validator only notes them; 1.0.x
+// validators refuse them anywhere.
 const MESSY_USER_FILES = {
   'projects/screenshot.png': Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'),
   'knowledge/reading-notes.md': '# Reading notes (fictional)\n\nSee [the chapter summary](./chapter-summary.md), not written yet.\n',
   'memory/pasted-by-mistake.md': `${['Fixture', 'Only', '-', 'Not', 'A', 'Key', '-', '2026', '!'].join('')}\n`,
+  'screenshot.png': Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'),
+  '.obsidian/plugins/x/main.js': `x()\n//# ${'sourceMapping'}URL=main.js.map\n`,
+  'Notes/a.md': '# A note (fictional)\n\nSee [gone](./gone.md).\n',
 }
+const MESSY_LINK = 'Notes/folder-link'
 
 function addMessyUserFiles(root) {
-  for (const [relativePath, contents] of Object.entries(MESSY_USER_FILES)) fs.writeFileSync(path.join(root, relativePath), contents)
+  for (const [relativePath, contents] of Object.entries(MESSY_USER_FILES)) {
+    fs.mkdirSync(path.dirname(path.join(root, relativePath)), { recursive: true })
+    fs.writeFileSync(path.join(root, relativePath), contents)
+  }
+  fs.symlinkSync(os.tmpdir(), path.join(root, MESSY_LINK))
 }
 
 // Before rolling back to 1.0.x, these move out along with instance/.
 function parkMessyUserFiles(root) {
   const parked = `${root}-files-parked`
-  for (const relativePath of Object.keys(MESSY_USER_FILES)) {
+  for (const relativePath of [...Object.keys(MESSY_USER_FILES), MESSY_LINK]) {
     fs.mkdirSync(path.dirname(path.join(parked, relativePath)), { recursive: true })
     fs.renameSync(path.join(root, relativePath), path.join(parked, relativePath))
   }
@@ -297,7 +313,7 @@ function parkMessyUserFiles(root) {
 }
 
 function unparkMessyUserFiles(root, parked) {
-  for (const relativePath of Object.keys(MESSY_USER_FILES)) fs.renameSync(path.join(parked, relativePath), path.join(root, relativePath))
+  for (const relativePath of [...Object.keys(MESSY_USER_FILES), MESSY_LINK]) fs.renameSync(path.join(parked, relativePath), path.join(root, relativePath))
 }
 
 try {
@@ -424,7 +440,7 @@ try {
   addMessyUserFiles(personal)
   personalUser = userFilesHash(personal)
   const messyValidate = validate(personal)
-  check(messyValidate.status === 0 && /Notes about your own files \(3\)/.test(messyValidate.out), `${dev1Version} validator only notes a screenshot, a broken link, and key-shaped text in the user's folders`, messyValidate.out)
+  check(messyValidate.status === 0 && /Notes about your own files \(7\)/.test(messyValidate.out), `${dev1Version} validator only notes screenshots (one at the top of the folder), broken links, key-shaped text, an editor folder's source map, and a link to a folder`, messyValidate.out)
 
   populateInstance(personal)
   const personalInstance = treeHash(path.join(personal, 'instance'))
@@ -432,7 +448,7 @@ try {
   check(p2.status === 0 && version(personal) === dev2Version, `${dev1Version} -> ${dev2Version} on the personalized install with a populated instance/`, p2.out)
   check(userFilesHash(personal) === personalUser && treeHash(path.join(personal, 'instance')) === personalInstance, 'user files and instance/ byte-identical after the update')
   const pr2 = rollback(personal, p2.tx)
-  check(pr2.status === 0 && version(personal) === dev1Version && state(personal).activeTransactionId === null, `rollback ${dev2Version} -> ${dev1Version} completes on the personalized install with a screenshot, a broken link, and key-shaped text in its folders`, pr2.out)
+  check(pr2.status === 0 && version(personal) === dev1Version && state(personal).activeTransactionId === null, `rollback ${dev2Version} -> ${dev1Version} completes on the personalized install with those files in and outside its user-owned folders`, pr2.out)
   check(userFilesHash(personal) === personalUser && treeHash(path.join(personal, 'instance')) === personalInstance, 'user files and instance/ byte-identical after rollback')
   const afterPersonalRollback = hiddenCopies(personal)
   check(clean(afterPersonalRollback), `no staging, journal-old, instance, or user-owned copies after rollback ${JSON.stringify(afterPersonalRollback)}`)

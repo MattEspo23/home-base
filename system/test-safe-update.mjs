@@ -959,10 +959,13 @@ try {
   for (const [root, commit] of [[realCurrent, '1'], [realIncoming, '2']]) {
     write(root, 'system/distribution/release.json', `${JSON.stringify({ schemaVersion: 1, source: { repository: 'https://example.test/home-base', ref: 'fixture', commit: commit.repeat(40) } }, null, 2)}\n`)
   }
-  write(realCurrent, 'projects/screenshot.png', Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'))
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
+  write(realCurrent, 'projects/screenshot.png', png)
   write(realCurrent, 'knowledge/reading-notes.md', '# Reading notes (fictional)\n\nSee [the chapter summary](./chapter-summary.md), not written yet.\n')
   // Fake and assembled at runtime, so this file itself holds no such shape.
   write(realCurrent, 'memory/pasted-by-mistake.md', `${['Fixture', 'Only', '-', 'Not', 'A', 'Key', '-', '2026', '!'].join('')}\n`)
+  // Outside every manifest folder: a stray screenshot at the top of the folder.
+  write(realCurrent, 'screenshot.png', png)
   const runValidator = (target, extra = []) => spawnSync(process.execPath, [path.join(target, 'system', 'validate.mjs'), ...extra], { cwd: target, encoding: 'utf8' })
   const realValidate = (target) => {
     const result = runValidator(target)
@@ -970,20 +973,70 @@ try {
   }
   const lenient = runValidator(realCurrent)
   assert.equal(lenient.status, 0, `${lenient.stdout}${lenient.stderr}`)
-  for (const expected of ['projects/screenshot.png is a media file', 'knowledge/reading-notes.md has a broken local link', 'memory/pasted-by-mistake.md contains text shaped like']) {
+  for (const expected of ['projects/screenshot.png is a media file', 'knowledge/reading-notes.md has a broken local link', 'memory/pasted-by-mistake.md contains text shaped like', '\n- screenshot.png is a media file']) {
     assert.ok(lenient.stdout.includes(expected), `validator notes ${expected}\n${lenient.stdout}`)
   }
   assert.equal(runValidator(realCurrent, ['--release']).status, 1, '--release still fails on the same files')
-  const userDigest = (root) => treeDigest(path.join(root, 'projects')) + treeDigest(path.join(root, 'knowledge')) + fs.readFileSync(path.join(root, 'memory', 'pasted-by-mistake.md'), 'utf8')
-  const realUserBefore = userDigest(realCurrent)
+  // Everything outside the maintained release roots and Home Base's own
+  // state, except the update history the updater appends to. Links are
+  // hashed as links, never followed.
+  const maintainedFolded = new Set(releaseManifest.maintainedPaths.map((name) => name.toLowerCase()))
+  const userDigest = (root) => {
+    const hash = crypto.createHash('sha256')
+    const visit = (relativePath) => {
+      if (relativePath === 'memory/UPDATE-HISTORY.md') return
+      const absolute = path.join(root, relativePath)
+      const stat = fs.lstatSync(absolute)
+      if (stat.isSymbolicLink()) hash.update(`L:${relativePath}->${fs.readlinkSync(absolute)}\n`)
+      else if (stat.isFile()) hash.update(`F:${relativePath}:${crypto.createHash('sha256').update(fs.readFileSync(absolute)).digest('hex')}\n`)
+      else for (const entry of fs.readdirSync(absolute).sort()) visit(`${relativePath}/${entry}`)
+    }
+    for (const entry of fs.readdirSync(root).sort()) {
+      if (!maintainedFolded.has(entry.toLowerCase()) && entry !== '.home-base') visit(entry)
+    }
+    return hash.digest('hex')
+  }
+
+  // Update with the stray root screenshot in place (it once failed after the swap).
+  let realUserBefore = userDigest(realCurrent)
   initializeUpdateState(realCurrent)
   const realTx = applyFixture(realCurrent, realIncoming, { validate: realValidate, validateRestored: realValidate })
   assert.equal(versionOf(realCurrent), nextVersion)
   assert.equal(userDigest(realCurrent), realUserBefore)
+
+  // Before the rollback the user adds an editor folder with a source map, a
+  // new folder with a broken link, links to a folder and to a file, a file
+  // over 2 MB, and a small PDF whose digits look like a card number. None of
+  // them may stop the rollback, crash the validator, or be followed.
+  write(realCurrent, '.obsidian/plugins/x/main.js', `x()\n//# ${'sourceMapping'}URL=main.js.map\n`)
+  write(realCurrent, 'Notes/a.md', '# A note (fictional)\n\nSee [gone](./gone.md).\n')
+  fs.symlinkSync(path.join(fixtureRoot, 'large-preview-current'), path.join(realCurrent, 'projects', 'folder-link'))
+  fs.symlinkSync('../README.md', path.join(realCurrent, 'Notes', 'readme-link.md'))
+  write(realCurrent, 'projects/big.txt', Buffer.alloc(3 * 1024 * 1024, 'a'))
+  write(realCurrent, 'projects/report.pdf', `%PDF-1.4\n${['4111', '1111', '1111', '1111'].join(' ')}\n%%EOF\n`)
+  const noted = runValidator(realCurrent)
+  assert.equal(noted.status, 0, `${noted.stdout}${noted.stderr}`)
+  for (const expected of [
+    '.obsidian/plugins/x/main.js is or references a source map',
+    'Notes/a.md has a broken local link',
+    'projects/folder-link is a symbolic link; Home Base never follows or reads it',
+    'Notes/readme-link.md is a symbolic link',
+    'projects/big.txt is larger than 2 MB',
+    'projects/report.pdf is a binary file such as a PDF or an archive',
+  ]) assert.ok(noted.stdout.includes(expected), `validator notes ${expected}\n${noted.stdout}`)
+  assert.ok(!noted.stdout.includes('report.pdf contains text shaped like'), 'a PDF is not called a password')
+  assert.doesNotMatch(noted.stdout + noted.stderr, /EISDIR|at file:/, 'no crash on a link to a folder')
+  realUserBefore = userDigest(realCurrent)
   rollbackCommittedUpdate(realCurrent, realTx, realTx, { validateRestored: realValidate })
   assert.equal(versionOf(realCurrent), currentVersion)
   assert.equal(stateOf(realCurrent).activeTransactionId, null)
   assert.equal(userDigest(realCurrent), realUserBefore)
+
+  // A link inside the user-owned folders is refused by the update engine up
+  // front (it copies those folders while staging), so it is moved out before
+  // the next update; the links outside them stay.
+  fs.renameSync(path.join(realCurrent, 'projects', 'folder-link'), path.join(fixtureRoot, 'parked-folder-link'))
+  realUserBefore = userDigest(realCurrent)
   // An update cut off between the renames of system/ is recovered with the
   // CLI, whose restore runs the restored tree's real validator.
   const realPlan = prepareUpdate(realCurrent, realIncoming)
@@ -998,6 +1051,14 @@ try {
   assert.equal(versionOf(realCurrent), currentVersion)
   assert.equal(stateOf(realCurrent).activeTransactionId, null)
   assert.equal(userDigest(realCurrent), realUserBefore)
+
+  // A link inside the maintained files is still fatal, in plain words.
+  fs.symlinkSync('../README.md', path.join(realCurrent, 'system', 'stray-link.md'))
+  const strict = runValidator(realCurrent)
+  assert.equal(strict.status, 1)
+  assert.match(strict.stderr, /Release files may not contain symbolic links, hard links, or special files: system\/stray-link\.md is a symbolic link/)
+  assert.doesNotMatch(strict.stderr, /EISDIR|at file:/)
+  fs.rmSync(path.join(realCurrent, 'system', 'stray-link.md'))
   // An older Node.js gets a plain message before the update engine loads.
   const olderNode = 'data:text/javascript,Object.defineProperty(process.versions,"node",{value:"18.20.4"})'
   const realStateBefore = fs.readFileSync(path.join(realCurrent, '.home-base', 'state', 'update-state.json'))
@@ -1008,7 +1069,7 @@ try {
   assert.doesNotMatch(refusedOld.stderr, /at file:/, 'no stack trace')
   assert.deepEqual(fs.readFileSync(path.join(realCurrent, '.home-base', 'state', 'update-state.json')), realStateBefore)
   pass('on Node.js older than 20 the updater says so plainly, with no stack trace, before loading the engine, and changes nothing')
-  pass('with a screenshot, a broken link, and key-shaped text in the user\'s own folders, the real validator only notes them, and update, rollback, and recovery all complete with those files byte-identical (--release still refuses them)')
+  pass('with a screenshot at the top of the folder and in projects/, an editor folder with a source map, a new folder with a broken link, links to a folder and a file, a 3 MB file, a PDF, and key-shaped text, the real validator only notes them (never following a link) and update, rollback, and recovery complete with all of them byte-identical; a link inside the maintained files is still fatal, and --release refuses the rest')
 } finally {
   fs.rmSync(fixtureRoot, { recursive: true, force: true })
 }

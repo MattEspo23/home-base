@@ -186,10 +186,12 @@ live folder. Success history is appended only after the new state and
 immutable base are durable. Both checks pass in a Home Base full of your own
 files, including one you keep in Git: the proof builds its test copies from
 release files and pristine starters only, and the validator applies the
-release rules (no images or other media, no broken local links, no
-password-shaped text, no source maps) to the maintained files only. In your
-own folders it lists the same problems as notes, which are worth a look but
-never stop an update, rollback, or recovery.
+release rules (no images or other media, no links or special files, no broken
+local links, no password-shaped text, no source maps) to the maintained files
+only. Everywhere else (your own folders, and any other file or folder you or
+an assistant add, such as a screenshot or an editor's settings folder) it
+lists the same problems as notes, which are worth a look but never stop an
+update, rollback, or recovery. It never follows a link.
 
 The stage holds only the new maintained roots plus a short-lived copy of the
 user-owned folders, which validation needs. It never holds `instance/` or other
@@ -304,16 +306,18 @@ You can then update normally.
 
 Releases before 1.1 do not know about `instance/`. Their validator checks the
 whole folder, your own folders included, and rejects symbolic links, images
-and other media, broken local links, and password-shaped text anywhere. So it
-fails on a populated `instance/`, and on such files in your own folders.
+and other media, broken local links, source maps, and password-shaped text
+anywhere; it reads large and binary files (such as PDFs) as text too, and can
+mistake them for passwords. So it fails on a populated `instance/`, and on
+such files anywhere else.
 Moving back to 1.0.x therefore needs one extra step, called parking:
 
 1. Move `instance/` out of the Home Base folder to a sibling folder on the same
    disk, for example `<home-base-folder>-instance-parked`.
 2. Run `node system/validate.mjs`. Every file it lists under “Notes about your
-   own files” would stop the 1.0.x validator. Move those files out too, to a
-   sibling folder such as `<home-base-folder>-files-parked`, keeping their
-   folder names.
+   own files” (including files over 2 MB and binary files) could stop the
+   1.0.x validator. Move those files out too, to a sibling folder such as
+   `<home-base-folder>-files-parked`, keeping their folder names.
 3. Run the rollback above, once per transaction, until the 1.0.x release is
    current again.
 4. Leave everything parked while you are on 1.0.x.
@@ -322,10 +326,12 @@ Moving back to 1.0.x therefore needs one extra step, called parking:
 
 If a rollback to 1.0.x was started without parking, it stops with
 `recovery_required` (the 1.0.x files are back, but validation failed). Park
-`instance/`, then run the `recover` command the error printed (also saved as
-`recoverCommand` in `.home-base/state/recovery.json`). Do not use the 1.0.x
-`node system/update.mjs recover` for this: on a Home Base that holds your own
-files, its proof refuses to finish.
+`instance/` and every file the error names (the 1.0.x validator lists what it
+refused), then run the `recover` command the error printed (also saved as
+`recoverCommand` in `.home-base/state/recovery.json`). If it stops again,
+park the files it names now and run the same command again. Do not use the
+1.0.x `node system/update.mjs recover` for this: on a Home Base that holds your
+own files, its proof refuses to finish.
 
 The first update from 1.0.x to 1.1 is run by the 1.0.x updater, which copies the
 whole folder into staging. Do it while `instance/` is parked or holds plain text
