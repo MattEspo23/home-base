@@ -181,7 +181,7 @@ idempotently recoverable; checkpoint tampering stops recovery.
 From the `home-base/` folder:
 
 ```bash
-node system/validate.mjs
+node system/validate.mjs --release
 node system/prove.mjs
 node system/test-capability-doctor.mjs
 node system/test-safe-update.mjs

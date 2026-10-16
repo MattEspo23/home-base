@@ -75,7 +75,7 @@ jobs:
 
       - name: User-facing checks on Node 20
         run: |
-          node system/validate.mjs
+          node system/validate.mjs --release
           node system/prove.mjs
           node system/test-capability-doctor.mjs
           node system/test-safe-update.mjs
