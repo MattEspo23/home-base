@@ -62,9 +62,11 @@ When the user asks to open the dashboard:
 3. Give the user the exact `http://127.0.0.1:<port>/#key=…` address it
    printed, once. Never rewrite it as `localhost`, and never shorten the key.
    The key is this computer’s own dashboard sign-in, not an account
-   credential, so Home Base’s rule against repeating credentials does not
-   stop you from handing it over. Never write it into any file, memory, note,
-   or index.
+   credential, and it works only on `127.0.0.1`, so Home Base’s rule against
+   repeating credentials does not stop you from handing it over (see the
+   exception in `system/SAFETY.md`). If the user asks, you may open that
+   exact address in a browser on this computer, including when they paste it
+   back. Never write it into any file, memory, note, or index.
 4. Tell them how to stop it: ask you to stop it (end the process you
    started), or press Ctrl+C in its Terminal window.
 

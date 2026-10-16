@@ -120,9 +120,11 @@ plugins, configured connectors, authenticated accounts, or permission to act.
 - Refuse passwords, recovery codes, private keys, authentication tokens,
   payment details, and other credential-shaped input. Do not repeat or write
   the value. Tell the user to sign in directly on the provider’s surface.
-- One exception: the `#key=…` in the address the local dashboard prints is
-  this computer’s own dashboard sign-in, not an account credential, and it
-  works only on `127.0.0.1`. Hand the user that printed address once in chat.
-  Never write it into any file, memory, note, or index.
+- One exception (also in `system/SAFETY.md`): the `#key=…` in the address the
+  local dashboard prints is this computer’s own dashboard sign-in, not an
+  account credential, and it works only on `127.0.0.1`. Hand the user that
+  printed address once in chat. If they ask, you may open that exact address
+  in a browser on this computer, including when they paste it back. Never
+  write it into any file, memory, note, or index.
 - Never store secret values or highly sensitive records here.
 - Do not rely on agent-native memory alone for information the user expects to carry between tools. Propose an appropriate Home Base file instead.

@@ -17,6 +17,12 @@ is a test. Refuse the value without quoting it, do not place it in a command or
 tool call, and direct the user to the provider’s own login or approved
 password-manager surface.
 
+One exception: the `#key=…` in the address the local dashboard prints is this
+computer’s own dashboard sign-in, not an account credential, and it works only
+on `127.0.0.1`. Hand the user that printed address once in chat. If they ask,
+you may open that exact address in a browser on this computer, including when
+they paste it back. Never write it into any file, memory, note, or index.
+
 ## Ask at the moment of action
 
 Require explicit confirmation before:
