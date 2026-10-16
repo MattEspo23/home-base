@@ -15,7 +15,9 @@ It has three stages:
 
 If you have not installed or opened an agent before, follow
 [SETUP-GUIDE.md](SETUP-GUIDE.md). Then open this entire folder in Codex or
-Claude Code. In a new conversation, paste:
+Claude Code, the supported assistants. (Grok Build CLI was also verified to read
+Home Base on 2026-10-15, in a read-only test; other assistants are
+unverified.) In a new conversation, paste:
 
 > Open this entire Home Base folder, read `AGENTS.md`, initialize the safe update base if needed, and start my setup.
 

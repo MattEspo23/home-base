@@ -13,7 +13,26 @@ const systemDir = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(systemDir, '..')
 const errors = []
 const checks = []
+const notes = []
 let skillVaultPackageNames = new Set()
+
+// The release rules (no media, valid local links, no credential-shaped text,
+// no source maps, valid setup and skill metadata) block only the maintained
+// release files. The user's own folders are checked too, but a problem there
+// is a note, never a failure: updates, rollbacks, and recovery run this
+// validator (the 1.0.x updater runs it with no flags), and a screenshot or a
+// broken link in the user's notes must never stop them. `--release` makes the
+// notes failures again, for a pristine release tree (package.mjs uses it).
+const releaseMode = process.argv.includes('--release')
+const fold = (name) => name.normalize('NFKC').toLowerCase()
+const userOwnedRoots = (() => {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'system', 'release-manifest.json'), 'utf8'))
+    return new Set((manifest.userOwnedPaths ?? []).map(fold))
+  } catch {
+    return new Set()
+  }
+})()
 
 function pass(message) {
   checks.push(message)
@@ -23,6 +42,16 @@ function fail(message) {
   errors.push(message)
 }
 
+function isUserOwned(relativePath) {
+  return userOwnedRoots.has(fold(relativePath.split('/')[0]))
+}
+
+// A problem in a user-owned file is a note unless --release is given.
+function problem(relativePath, message) {
+  if (isUserOwned(relativePath) && !releaseMode) notes.push(message)
+  else fail(message)
+}
+
 function relative(filePath) {
   return path.relative(root, filePath).split(path.sep).join('/')
 }
@@ -30,7 +59,7 @@ function relative(filePath) {
 function read(relativePath) {
   const absolutePath = path.join(root, relativePath)
   if (!fs.existsSync(absolutePath)) {
-    fail(`Missing required file: ${relativePath}`)
+    problem(relativePath, `Missing required file: ${relativePath}`)
     return ''
   }
   return fs.readFileSync(absolutePath, 'utf8')
@@ -42,6 +71,9 @@ function walk(directory) {
     if (entry.isDirectory() && ['.git', '.home-base', 'node_modules'].includes(entry.name)) {
       return []
     }
+    // instance/ (any letter case) is the user's private overlay: never
+    // packaged, never an update target, and outside every rule here.
+    if (directory === root && fold(entry.name) === updateInternals.INSTANCE_ROOT) return []
     if (entry.isFile() && entry.name.endsWith('.tgz')) return []
     const entryPath = path.join(directory, entry.name)
     return entry.isDirectory() ? walk(entryPath) : [entryPath]
@@ -51,7 +83,7 @@ function walk(directory) {
 function frontmatter(contents, filePath) {
   const match = contents.match(/^---\r?\n([\s\S]*?)\r?\n---/)
   if (!match) {
-    fail(`${filePath} must start with YAML frontmatter`)
+    problem(filePath, `${filePath} must start with YAML frontmatter`)
     return {}
   }
 
@@ -108,6 +140,26 @@ const requiredFiles = [
   'system/test-capability-doctor.mjs',
   'system/test-safe-update.mjs',
   'system/test-release-retrieval.mjs',
+  'system/test-tracked-files.mjs',
+  'system/test-instance-skills.mjs',
+  'system/instance-skills.mjs',
+  'system/privacy-scan.mjs',
+  'system/privacy-allowlist.json',
+  'system/test-privacy-scan.mjs',
+  'system/hooks/pre-push',
+  'system/PROMOTION.md',
+  'system/test-transition.mjs',
+  'system/dashboard/README.md',
+  'system/dashboard/serve.mjs',
+  'system/dashboard/build.mjs',
+  'system/dashboard/test-dashboard.mjs',
+  'system/dashboard/lib/server.mjs',
+  'system/dashboard/lib/status.mjs',
+  'system/dashboard/src/index.html',
+  'system/dashboard/dist/index.html',
+  'system/dashboard/dist/build-info.json',
+  'system/dashboard/dist/main.js',
+  'system/dashboard/dist/styles.css',
   'system/release-manifest.json',
   'system/lib/contracts.mjs',
   'system/lib/update-contract.mjs',
@@ -115,6 +167,7 @@ const requiredFiles = [
   'system/lib/capability-doctor.mjs',
   'system/lib/skill-vault-contract.mjs',
   'system/lib/release-retrieval-contract.mjs',
+  'system/lib/tracked-files.mjs',
   'system/distribution/README.md',
   'system/distribution/SKILL-CATALOG.md',
   'system/distribution/skill-vault.lock.json',
@@ -213,7 +266,7 @@ const requiredFiles = [
 ]
 
 for (const requiredFile of requiredFiles) read(requiredFile)
-if (errors.length === 0) pass(`${requiredFiles.length} required files exist`)
+if (errors.length === 0) pass(`${requiredFiles.length} required release files exist`)
 
 const agents = read('AGENTS.md')
 for (const expectedReference of [
@@ -252,20 +305,20 @@ if (!claude.startsWith('@AGENTS.md')) {
 
 const setup = frontmatter(read('you/SETUP.md'), 'you/SETUP.md')
 if (!['not_started', 'in_progress', 'complete'].includes(setup.setup_status)) {
-  fail('you/SETUP.md setup_status must be not_started, in_progress, or complete')
+  problem('you/SETUP.md', 'you/SETUP.md setup_status must be not_started, in_progress, or complete')
 } else {
   pass(`Setup state is valid: ${setup.setup_status}`)
 }
 if (!['none', 'personal', 'work', 'both'].includes(setup.discovery_path)) {
-  fail('you/SETUP.md discovery_path must be none, personal, work, or both')
+  problem('you/SETUP.md', 'you/SETUP.md discovery_path must be none, personal, work, or both')
 }
 if (!['orient', 'opportunity_map', 'blueprint', 'build', 'complete'].includes(setup.stage)) {
-  fail('you/SETUP.md stage is not a supported 1.0 lifecycle stage')
+  problem('you/SETUP.md', 'you/SETUP.md stage is not a supported 1.0 lifecycle stage')
 }
 if (!/^[0-8]$/.test(setup.orientation_completed ?? '')) {
-  fail('you/SETUP.md orientation_completed must be an integer from 0 to 8')
+  problem('you/SETUP.md', 'you/SETUP.md orientation_completed must be an integer from 0 to 8')
 }
-if (!errors.some((error) => error.startsWith('you/SETUP.md'))) {
+if (![...errors, ...notes].some((message) => message.startsWith('you/SETUP.md'))) {
   pass('Setup tracks discovery path and progressive 1.0 stage')
 }
 
@@ -333,11 +386,11 @@ for (const skillFile of walk(path.join(root, 'skills')).filter(
   const skillPath = relative(skillFile)
   const metadata = frontmatter(fs.readFileSync(skillFile, 'utf8'), skillPath)
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(metadata.name ?? '')) {
-    fail(`${skillPath} name must be kebab-case`)
+    problem(skillPath, `${skillPath} name must be kebab-case`)
   }
-  if (!metadata.description) fail(`${skillPath} must include a description`)
+  if (!metadata.description) problem(skillPath, `${skillPath} must include a description`)
 }
-if (!errors.some((error) => error.startsWith('skills/'))) {
+if (![...errors, ...notes].some((message) => message.startsWith('skills/'))) {
   pass('User-created skill metadata is valid')
 }
 
@@ -370,18 +423,35 @@ if (scenarioContract) {
   }
 }
 
-const version = read('VERSION.md')
-if (!version.includes('1.0.1') || !version.includes('public stable release')) {
-  fail('VERSION.md must identify the public stable Home Base 1.0 release')
-} else {
-  pass('Version metadata identifies public stable Home Base 1.0')
-}
-
 let releaseManifest
 try {
   releaseManifest = JSON.parse(read('system/release-manifest.json'))
 } catch (error) {
   fail(`Release manifest is invalid JSON: ${error.message}`)
+}
+
+// The release version comes from the manifest. Only the stable channel stays
+// pinned to the last public stable release.
+const LAST_STABLE_VERSION = '1.1.0'
+const releaseVersion = releaseManifest?.version ?? ''
+const isPrerelease = /^1\.\d+\.\d+-dev\.\d+$/.test(releaseVersion)
+// A stable build is only ever the pinned last public stable release; a new
+// stable version needs this constant (and the stable channel) moved on purpose.
+const isStable = releaseVersion === LAST_STABLE_VERSION
+const version = read('VERSION.md')
+const versionStatus = isPrerelease ? 'Status: pre-release' : 'Status: public stable release'
+const versionLines = version.split(/\r?\n/).filter((line) => /^\s*-?\s*Version:/.test(line))
+const statusLines = version.split(/\r?\n/).filter((line) => /^\s*-?\s*Status:/.test(line))
+if (
+  (!isPrerelease && !isStable) ||
+  versionLines.length !== 1 ||
+  statusLines.length !== 1 ||
+  !versionLines[0].includes(`Version: \`${releaseVersion}\``) ||
+  !statusLines[0].includes(versionStatus)
+) {
+  fail(`VERSION.md must identify the manifest version with exactly one Version and one Status line; a stable build must be ${LAST_STABLE_VERSION}, anything else a -dev.N pre-release`)
+} else {
+  pass(`Version metadata identifies Home Base ${releaseVersion} (${isPrerelease ? 'pre-release' : 'public stable'})`)
 }
 if (releaseManifest) {
   const maintained = releaseManifest.maintainedPaths ?? []
@@ -396,8 +466,8 @@ if (releaseManifest) {
   )
   if (
     releaseManifest.schemaVersion !== 2 ||
-    releaseManifest.releaseId !== 'home-base-1.0.1' ||
-    releaseManifest.version !== '1.0.1' ||
+    releaseManifest.releaseId !== `home-base-${releaseVersion}` ||
+    JSON.stringify(releaseManifest.instancePaths) !== JSON.stringify([updateInternals.INSTANCE_ROOT]) ||
     releaseManifest.starterSourceRoot !== 'system/starter' ||
     overlap.length > 0 ||
     !userOwned.includes('you') ||
@@ -410,9 +480,18 @@ if (releaseManifest) {
     !maintained.includes('.github') ||
     !maintained.includes('channels')
   ) {
-    fail('Release manifest must separate maintained and user-owned 1.0 paths')
+    fail('Release manifest must separate maintained, user-owned, and instance paths')
   } else {
-    pass('Release manifest separates maintained behavior from user-owned content')
+    pass('Release manifest separates maintained behavior, user-owned content, and the private instance zone')
+  }
+  const ignoreLines = read('.gitignore').split(/\r?\n/)
+  if (!ignoreLines.includes(`${updateInternals.INSTANCE_ROOT}/`) || !ignoreLines.includes('[Ii][Nn][Ss][Tt][Aa][Nn][Cc][Ee]/')) {
+    fail('.gitignore must keep the private instance/ overlay (and its case variants) out of Git')
+  }
+  try {
+    updateInternals.readManifest(root)
+  } catch (error) {
+    fail(`Release manifest paths are unsafe for the update engine: ${error.message}`)
   }
 
   const missingStarterSources = (releaseManifest.starterFiles ?? []).filter(
@@ -430,7 +509,7 @@ if (releaseManifest) {
   }
 
   const updateGuide = read('system/UPDATE-GUIDE.md')
-  const undocumentedPaths = [...maintained, ...userOwned].filter(
+  const undocumentedPaths = [...maintained, ...userOwned, ...(releaseManifest.instancePaths ?? [])].filter(
     (releasePath) => !updateGuide.includes(releasePath),
   )
   if (undocumentedPaths.length > 0) {
@@ -451,7 +530,7 @@ try {
   if (
     !license.includes('Copyright (c) 2026 Matthew Esposito') ||
     upstreamHash !== '0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5' ||
-    provenance.product?.version !== '1.0.1' ||
+    provenance.product?.version !== releaseVersion ||
     provenance.homeBaseCoreSkills?.length !== 13 ||
     provenance.skillVault?.commit !== skillLock.source?.commit ||
     provenance.skillVault?.projectionDigest !== skillLock.projectionDigest
@@ -482,11 +561,22 @@ if (
   pass('Support, security, brand, and sanitized-intake boundaries are explicit')
 }
 
-const excludedBrandMedia = walk(root).filter((filePath) =>
-  /\.(?:png|jpe?g|gif|webp|svg|mp3|wav|m4a|mp4|mov)$/i.test(filePath),
-)
+const MEDIA = /\.(?:png|jpe?g|gif|webp|svg|mp3|wav|m4a|mp4|mov)$/i
+const LARGE_USER_FILE = 2 * 1024 * 1024
+const sourceMaps = walk(root).filter((filePath) =>
+  filePath.endsWith('.map') ||
+  (/\.(?:m?js|css)$/.test(filePath) && /[#@]\s*sourceMappingURL=/.test(fs.readFileSync(filePath, 'utf8'))),
+).map(relative).filter((file) => file !== 'system/validate.mjs')
+for (const file of sourceMaps.filter(isUserOwned)) problem(file, `${file} is or references a source map (fine in your own folder; it is never packaged)`)
+const releaseSourceMaps = sourceMaps.filter((file) => !isUserOwned(file))
+if (releaseSourceMaps.length > 0) fail(`Release contains source maps or sourceMappingURL comments: ${releaseSourceMaps.join(', ')}`)
+else pass('Release contains no source maps')
+
+const media = walk(root).filter((filePath) => MEDIA.test(filePath)).map(relative)
+for (const file of media.filter(isUserOwned)) problem(file, `${file} is a media file (fine in your own folder; it is never packaged)`)
+const excludedBrandMedia = media.filter((file) => !isUserOwned(file))
 if (excludedBrandMedia.length > 0) {
-  fail(`Release contains excluded brand/media files: ${excludedBrandMedia.map(relative).join(', ')}`)
+  fail(`Release contains excluded brand/media files: ${excludedBrandMedia.join(', ')}`)
 } else {
   pass('Release contains zero logo, portrait, audio, video, course-art, or promotional-media files')
 }
@@ -499,12 +589,12 @@ try {
     previewChannel.channel !== 'preview' ||
     stableChannel.state !== 'available' ||
     previewChannel.state !== 'unavailable' ||
-    stableChannel.metadataUrl !== 'https://github.com/MattEspo23/home-base/releases/download/v1.0.1/home-base-1.0.1.tgz.json' ||
+    stableChannel.metadataUrl !== `https://github.com/MattEspo23/home-base/releases/download/v${LAST_STABLE_VERSION}/home-base-${LAST_STABLE_VERSION}.tgz.json` ||
     previewChannel.metadataUrl !== null
   ) {
     fail('Stable release discovery must be immutable while preview fails closed')
   } else {
-    pass('Stable discovery points to v1.0.1 metadata and preview fails closed')
+    pass(`Stable discovery points to v${LAST_STABLE_VERSION} metadata and preview fails closed`)
   }
 } catch (error) {
   fail(`Update channel contract is invalid: ${error.message}`)
@@ -664,7 +754,10 @@ for (const markdownFile of markdownFiles) {
   const markdownRelative = relative(markdownFile)
   const projectedSkillMatch = markdownRelative.match(/^\.(?:agents|claude)\/skills\/([^/]+)\//)
   if (projectedSkillMatch && skillVaultPackageNames.has(projectedSkillMatch[1])) continue
+  // Fenced blocks and inline code spans show example lines, not links.
   const contents = fs.readFileSync(markdownFile, 'utf8')
+    .replace(/^([ \t]*)(```|~~~)[^\n]*\n[\s\S]*?^\1\2[^\n]*$/gm, '')
+    .replace(/`[^`\n]+`/g, '')
   for (const match of contents.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
     const target = match[1].trim()
     if (
@@ -677,13 +770,13 @@ for (const markdownFile of markdownFiles) {
       continue
     }
     if (path.isAbsolute(target)) {
-      fail(`${markdownRelative} has a non-portable absolute local link: ${target}`)
+      problem(markdownRelative, `${markdownRelative} has a non-portable absolute local link: ${target}`)
       continue
     }
     const targetWithoutAnchor = target.split('#')[0]
     const resolved = path.resolve(path.dirname(markdownFile), targetWithoutAnchor)
     if (!fs.existsSync(resolved)) {
-      fail(`${markdownRelative} has a broken local link: ${target}`)
+      problem(markdownRelative, `${markdownRelative} has a broken local link: ${target}`)
     }
   }
 }
@@ -701,9 +794,13 @@ const credentialScanAllowlist = new Set([
 for (const textFile of walk(root)) {
   const file = relative(textFile)
   if (credentialScanAllowlist.has(file)) continue
+  // The user's own media and large files are not text worth scanning.
+  if (isUserOwned(file) && (MEDIA.test(file) || fs.statSync(textFile).size > LARGE_USER_FILE)) continue
   const contents = fs.readFileSync(textFile, 'utf8')
   if (containsCredentialShape(contents)) {
-    fail(`Release file contains credential-shaped content: ${file}`)
+    problem(file, isUserOwned(file)
+      ? `${file} contains text shaped like a password, key, or token; Home Base should not store secrets, so remove it if it is real`
+      : `Release file contains credential-shaped content: ${file}`)
   }
 }
 if (!errors.some((error) => error.includes('secret-like'))) {
@@ -712,11 +809,19 @@ if (!errors.some((error) => error.includes('secret-like'))) {
   }
 }
 
+function printNotes() {
+  if (notes.length === 0) return
+  console.log(`Notes about your own files (${notes.length}); they never block an update, rollback, or recovery:`)
+  for (const note of notes) console.log(`- ${note}`)
+}
+
 if (errors.length > 0) {
   console.error(`Home Base validation failed with ${errors.length} error(s):`)
   for (const error of errors) console.error(`- ${error}`)
+  printNotes()
   process.exitCode = 1
 } else {
   console.log(`Home Base validation passed (${checks.length} checks):`)
   for (const check of checks) console.log(`- ${check}`)
+  printNotes()
 }

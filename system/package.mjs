@@ -16,8 +16,13 @@ import { updateInternals } from './lib/safe-update-contract.mjs'
 import {
   loadReleaseManifest,
   releaseFiles,
-  releaseSourcePath,
 } from './lib/update-contract.mjs'
+import {
+  readTrackedBlobs,
+  trackedHomeBaseTree,
+  trackedReleaseFiles,
+  trackedReleaseSource,
+} from './lib/tracked-files.mjs'
 
 const systemDir = path.dirname(fileURLToPath(import.meta.url))
 const homeBaseRoot = path.resolve(systemDir, '..')
@@ -32,17 +37,41 @@ if (!output || !path.isAbsolute(output)) {
   )
 }
 
-function runScript(targetRoot, script) {
-  const result = spawnSync(process.execPath, [path.join(targetRoot, 'system', script)], {
+// A public package writes stable-channel metadata, so it must be a plain
+// MAJOR.MINOR.PATCH release, never a -dev or other pre-release. Checked before
+// anything else runs.
+if (publicRelease) {
+  const { version } = loadReleaseManifest(homeBaseRoot)
+  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`Public packaging refuses pre-release version ${version}`)
+}
+
+function runScript(targetRoot, scriptWithArgs) {
+  const [script, ...scriptArgs] = scriptWithArgs.split(' ')
+  const result = spawnSync(process.execPath, [path.join(targetRoot, 'system', script), ...scriptArgs], {
     cwd: targetRoot,
     encoding: 'utf8',
   })
   if (result.status !== 0) {
-    throw new Error(`${script} failed:\n${result.stdout ?? ''}${result.stderr ?? ''}`)
+    throw new Error(`${scriptWithArgs} failed:\n${result.stdout ?? ''}${result.stderr ?? ''}`)
   }
 }
 
-for (const script of ['validate.mjs', 'prove.mjs', 'test-capability-doctor.mjs', 'test-safe-update.mjs', 'test-release-retrieval.mjs']) {
+// Every shipped proof runs on the source tree, the staged tree, and the tree
+// re-extracted from the archive. A release tree holds only pristine starter
+// copies of the user-owned folders, so validation is strict there too.
+const releaseScripts = [
+  'validate.mjs --release',
+  'prove.mjs',
+  'test-capability-doctor.mjs',
+  'test-safe-update.mjs',
+  'test-release-retrieval.mjs',
+  'test-tracked-files.mjs',
+  'test-instance-skills.mjs',
+  'test-privacy-scan.mjs',
+  'dashboard/build.mjs --check',
+  'dashboard/test-dashboard.mjs',
+]
+for (const script of releaseScripts) {
   runScript(homeBaseRoot, script)
 }
 
@@ -109,21 +138,28 @@ const proofParent = fs.mkdtempSync(path.join(os.tmpdir(), 'home-base-extracted-p
 const extractedDestination = path.join(proofParent, 'verified')
 
 try {
-  for (const relativePath of releaseFiles(homeBaseRoot, manifest)) {
-    const sourcePath = releaseSourcePath(homeBaseRoot, manifest, relativePath)
-    if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
-      throw new Error(
-        `Release source is missing for ${relativePath}: ${path.relative(homeBaseRoot, sourcePath)}`,
-      )
-    }
-    const contents = fs.readFileSync(sourcePath)
+  // Release inputs are the committed blobs at HEAD (tracked files only), never
+  // working-tree bytes. Untracked or ignored files inside maintained paths, and
+  // the ignored instance/ overlay, cannot reach the archive.
+  const tracked = trackedHomeBaseTree(repositoryRoot, relativeHomeBase)
+  const releaseList = trackedReleaseFiles(tracked, manifest)
+  const releaseSet = new Set(releaseList)
+  const excluded = releaseFiles(homeBaseRoot, manifest).filter((file) => !releaseSet.has(file))
+  console.log(`Excluded ${excluded.length} untracked or ignored file(s) inside maintained paths`)
+  const sources = releaseList.map((relativePath) => ({
+    relativePath,
+    ...trackedReleaseSource(tracked, manifest, relativePath),
+  }))
+  const blobs = readTrackedBlobs(repositoryRoot, sources.map((source) => source.blob))
+  for (const source of sources) {
+    const contents = blobs.get(source.blob)
     if (containsCredentialShape(contents.toString('utf8'))) {
-      throw new Error(`Credential-shaped content blocks packaging: ${relativePath}`)
+      throw new Error(`Credential-shaped content blocks packaging: ${source.relativePath}`)
     }
-    const destination = path.join(stagedHomeBase, relativePath)
+    const destination = path.join(stagedHomeBase, source.relativePath)
     fs.mkdirSync(path.dirname(destination), { recursive: true })
-    fs.copyFileSync(sourcePath, destination)
-    fs.chmodSync(destination, fs.statSync(sourcePath).mode & 0o111 ? 0o755 : 0o644)
+    fs.writeFileSync(destination, contents)
+    fs.chmodSync(destination, source.mode === '100755' ? 0o755 : 0o644)
   }
 
   const projection = validateSkillVaultProjection(stagedHomeBase)
@@ -147,7 +183,7 @@ try {
   const releaseReceiptPath = path.join(stagedHomeBase, 'system', 'distribution', 'release.json')
   fs.writeFileSync(releaseReceiptPath, `${JSON.stringify(releaseReceipt, null, 2)}\n`)
   updateInternals.scanWholeTree(stagedHomeBase)
-  for (const script of ['validate.mjs', 'prove.mjs', 'test-capability-doctor.mjs', 'test-safe-update.mjs', 'test-release-retrieval.mjs']) {
+  for (const script of releaseScripts) {
     runScript(stagedHomeBase, script)
   }
 
@@ -179,7 +215,7 @@ try {
       throw new Error(`Credential-shaped content blocks extracted archive: ${filePath}`)
     }
   }
-  for (const script of ['validate.mjs', 'prove.mjs', 'test-capability-doctor.mjs', 'test-safe-update.mjs', 'test-release-retrieval.mjs']) {
+  for (const script of releaseScripts) {
     runScript(extractedHomeBase, script)
   }
 

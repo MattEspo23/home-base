@@ -1,6 +1,6 @@
 # Third-party notices
 
-Home Base `1.0.1` includes the released EspoAI Skill Vault tag `v0.1.3` at
+Home Base `1.1.0` includes the released EspoAI Skill Vault tag `v0.1.3` at
 commit `cf0df42008cdffa79556a35ef79b803d3b2f19d7` and tree
 `13d65f76bc07afd05b14e1318b2610bf47d13926`.
 

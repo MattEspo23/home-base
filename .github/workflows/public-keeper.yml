@@ -14,6 +14,9 @@ concurrency:
 
 jobs:
   keeper:
+    # Only in the public Home Base repository: a user who keeps their own
+    # Home Base on GitHub gets no maintainer CI runs on their files.
+    if: github.repository == 'MattEspo23/home-base'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

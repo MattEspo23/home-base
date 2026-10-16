@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="home-base-token" content="__HOME_BASE_LAUNCH__" />
+    <meta name="home-base-db" content="__HOME_BASE_DB__" />
+    <title>Home Base</title>
+    <link rel="stylesheet" href="/app/styles.css" />
+    <script type="module" src="/app/main.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to your Home Base</a>
+    <header class="masthead">
+      <div class="wrap masthead-row">
+        <h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Home Base</h1>
+        <p class="where"><span class="where-dot" aria-hidden="true"></span>On this computer only</p>
+      </div>
+    </header>
+    <main id="main" class="wrap" tabindex="-1">
+      <section class="panel" id="home" aria-labelledby="home-title">
+        <div class="panel-head">
+          <p class="kicker" aria-hidden="true">01</p>
+          <h2 id="home-title">Your Home Base</h2>
+        </div>
+        <div class="panel-body" id="home-body" aria-live="polite">
+          <p class="loading">Loading your Home Base…</p>
+        </div>
+      </section>
+      <section class="panel" id="assistants" aria-labelledby="assistants-title">
+        <div class="panel-head">
+          <p class="kicker" aria-hidden="true">02</p>
+          <h2 id="assistants-title">Assistants</h2>
+        </div>
+        <div class="panel-body" id="assistants-body">
+          <p class="loading">Loading…</p>
+        </div>
+      </section>
+      <section class="panel" id="domains" aria-labelledby="domains-title">
+        <div class="panel-head">
+          <p class="kicker" aria-hidden="true">03</p>
+          <h2 id="domains-title">Life domains</h2>
+        </div>
+        <div class="panel-body" id="domains-body">
+          <p class="loading">Loading…</p>
+        </div>
+      </section>
+    </main>
+    <footer class="wrap foot">
+      <p class="foot-note" id="foot-note">Reads a few names from your Home Base folder. It only writes its own settings file.</p>
+    </footer>
+  </body>
+</html>

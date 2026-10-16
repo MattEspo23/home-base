@@ -66,6 +66,10 @@ Revise the draft. Mark it `active` only when the user trusts it for real use.
 
 ## Index and learn
 
-Add the skill to `skills/INDEX.md` with status, trigger, and last-reviewed date.
+Add one linked line to `skills/INDEX.md` under the section that matches its
+status (Active, Draft, or Candidates):
+`- [Skill name](<skill-name>/SKILL.md) — trigger: …; reviewed YYYY-MM-DD`.
+Move the line when the status changes instead of adding a second one (see
+Index entries in `system/WORKSPACE-CONTRACT.md`).
 
 After the skill is used, compare the real run with the file. Propose specific updates for missing steps or changed conditions. Do not silently rewrite the trusted workflow during the task.

@@ -15,7 +15,9 @@ there is no SLA and no promised response or repair time.
 ## Supported environments
 
 - **Primary:** current Codex Desktop on a currently supported macOS release.
-- **Preview:** Claude Code adapter until a named live keeper run is recorded.
+- **Supported:** Claude Code, through `CLAUDE.md` and `.claude/skills/`.
+- **Verified to read Home Base:** Grok Build CLI, in a read-only test on
+  2026-10-15. It uses the same `AGENTS.md`, `CLAUDE.md`, and Skill folders.
 - **Community/unverified:** other operating systems, agents, forks, and custom
   toolchains. Unverified does not mean known-broken.
 

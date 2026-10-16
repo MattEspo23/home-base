@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Public facts the privacy scan may see. Reserved example domains and public service addresses are allowed everywhere; identity facts are allowed only in the files listed with them; unscannableFiles lists reviewed non-text files by exact path and sha256. Never add private information here.",
+  "reservedEmailDomains": [
+    "example",
+    "example.com",
+    "example.net",
+    "example.org",
+    "invalid",
+    "localhost",
+    "test",
+    "users.noreply.github.com"
+  ],
+  "publicEmails": [
+    "noreply@anthropic.com",
+    "noreply@github.com"
+  ],
+  "identityFacts": [
+    {
+      "fact": "Copyright holder named in the license, notices, provenance, and the validator that checks them",
+      "values": [
+        "Matthew Esposito",
+        "Esposito"
+      ],
+      "files": [
+        "LICENSE",
+        "NOTICE.md",
+        "PROVENANCE.json",
+        "TRADEMARKS.md",
+        "system/validate.mjs",
+        "system/privacy-allowlist.json",
+        "system/distribution/skill-vault/LICENSE",
+        "system/distribution/skill-vault/NOTICE.md",
+        "system/distribution/skill-vault/PROVENANCE.json"
+      ]
+    }
+  ],
+  "unscannableFiles": []
+}

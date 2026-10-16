@@ -16,7 +16,7 @@ This directory contains the maintained Home Base behavior.
 - `validate.mjs` — local structural checks
 - `prove.mjs` — deterministic behavior and reference-system proof
 - `inspect-runtime.mjs` — typed read-only Capability Doctor receipt
-- `release-manifest.json` — maintained, user-owned, and starter package paths
+- `release-manifest.json` — maintained, user-owned, instance, and starter package paths
 - `update.mjs` — initialize/preview/prepare/resolve/apply/recover/rollback
   three-way release transactions
 - `package.mjs` — clean-commit private archive, checksum, identity, and
@@ -27,8 +27,24 @@ This directory contains the maintained Home Base behavior.
   conflict, attack, interruption, recovery, and rollback fixtures
 - `test-release-retrieval.mjs` — redirect, identity, archive-topology, hash, and
   controlled-extraction fixtures
+- `lib/tracked-files.mjs` and `test-tracked-files.mjs` — packaging reads only
+  committed Git blobs, never ignored or untracked files
+- `instance-skills.mjs` and `test-instance-skills.mjs` — preview-first linking
+  of private skills from `instance/skills/` into the user-level skill folders
+- `privacy-scan.mjs`, `privacy-allowlist.json`, `test-privacy-scan.mjs`, and
+  `hooks/pre-push` — maintainer privacy scan with redacted output; the hook
+  is installed into `.git/hooks` with `node system/privacy-scan.mjs --install-hook`
+- `dashboard/` — the local, read-only Home Base dashboard: hardened
+  `serve.mjs` launcher, `src/` built into the committed `dist/` by
+  `build.mjs`, `test-dashboard.mjs`, and the optional `smoke-browser.mjs`
+  (drives a local Chrome or Chromium when one is installed)
+- `PROMOTION.md` — maintainer checklist for bringing private work into the
+  public repository
+- `test-transition.mjs` — maintainer-only 1.0.1 → 1.1 transition, instance, and
+  rollback fixture (needs the Git history and tags; not part of the package proof)
 
 Files under `you/`, `work/`, `opportunities/`, `systems/`, `capabilities/`,
 `ideas/`, `memory/`, `knowledge/`, `projects/`, `skills/`, `tools/`, and
 `inbox/` belong to the user. Maintained releases should avoid overwriting those
-paths.
+paths. `instance/` is the user’s private overlay; updates and packages never
+include or touch it.

@@ -51,6 +51,35 @@ Do not duplicate the same truth in several files. Put the full truth in one home
 
 Use relative links for files inside Home Base. Never write a local absolute machine path into a durable file.
 
+## Index entries
+
+An index lists records; the record file holds the detail. Write one linked
+line per record, under the `##` section that matches its status, with a link
+relative to the index file:
+
+```markdown
+- [Record name](relative/path.md) — one short line
+```
+
+- `projects/INDEX.md`: `- [Lake trip](lake-trip.md) — next: book the cabin`
+- `systems/INDEX.md`: `- [Weekly review](weekly-review/BLUEPRINT.md) — one line`
+  under Designing, Building or testing, Active, or Paused or retired.
+- `skills/INDEX.md`: `- [Packing check](packing-check/SKILL.md) — trigger: …; reviewed YYYY-MM-DD`
+  under Active, Draft, or Candidates. A candidate with no `SKILL.md` yet may
+  stay unlinked until the file exists.
+- `capabilities/INDEX.md`: one line per saved receipt, under Available and
+  verified, Available but unverified, Missing or blocked, or Superseded. When
+  the receipt records whether an assistant can work in this Home Base folder,
+  write exactly:
+  `- [<Assistant> opens Home Base directly](<file>.md) — <one line>; checked YYYY-MM-DD`
+  (use `reaches Home Base` instead when it works only through another tool).
+  Other capabilities use `- [<Capability>](<file>.md) — <one line>; checked YYYY-MM-DD`.
+
+When a status changes, move the existing line to the new section instead of
+adding a second one. Use the real calendar date of the check; without a valid
+date the dashboard shows an assistant as not verified yet. The local dashboard
+shows only linked lines and says how many other entries it could not show.
+
 ## Project protocol
 
 Every active project should name:

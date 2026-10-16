@@ -5,7 +5,8 @@ Use this workflow after the blueprint is confirmed.
 ## Enter the build stage
 
 Before changing system files, update `you/SETUP.md` to `stage: build` and make
-the next action the smallest useful file-first result. A confirmed blueprint
+the next action the smallest useful file-first result. Move the system's linked
+line in `systems/INDEX.md` to Building or testing. A confirmed blueprint
 authorizes local, reversible construction only; it does not authorize outside
 effects.
 
@@ -40,4 +41,5 @@ state, creating a new interface with external effects, or preparing a hosted
 deployment, follow `system/workflows/enter-build-mode.md`.
 
 No system becomes `active` until `PROOF.md` contains observed evidence and
-rollback/disconnect is legible.
+rollback/disconnect is legible. When it does, move its linked line in
+`systems/INDEX.md` to Active.

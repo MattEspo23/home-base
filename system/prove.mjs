@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
   canReopenDeclinedIdea,
@@ -27,10 +28,22 @@ import {
   releaseSourcePath,
   rollbackUpdate,
 } from './lib/update-contract.mjs'
+import { copyReleaseShapedTree as copyTrackedReleaseShapedTree } from './lib/tracked-files.mjs'
 
 const systemDir = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(systemDir, '..')
 const checks = []
+
+// Proof fixtures copy only a release-shaped tree: the maintained paths (tracked
+// files only in a development checkout; the files on disk in an installed
+// release, even one the user keeps in Git) plus pristine starter copies of the
+// user-owned folders. They never copy the user's own files, instance/, runtime
+// state, Git metadata, node_modules, or ignored local files such as .env.local
+// into the system temporary folder. So this proof passes unchanged when an
+// updater runs it inside an installed, personalized Home Base.
+function copyReleaseShapedTree(destination) {
+  copyTrackedReleaseShapedTree(root, destination, loadReleaseManifest(root))
+}
 
 function pass(message) {
   checks.push(message)
@@ -248,8 +261,8 @@ try {
   const currentRoot = path.join(updateFixtureRoot, 'current')
   const candidateRoot = path.join(updateFixtureRoot, 'candidate')
   const checkpointRoot = path.join(updateFixtureRoot, 'checkpoint')
-  fs.cpSync(root, currentRoot, { recursive: true })
-  fs.cpSync(root, candidateRoot, { recursive: true })
+  copyReleaseShapedTree(currentRoot)
+  copyReleaseShapedTree(candidateRoot)
 
   const originalReadme = read('README.md')
   const personalPreference = '# Preferences\n\n- Keep this personal choice.\n'
@@ -304,7 +317,7 @@ try {
   )
 
   const maliciousRoot = path.join(updateFixtureRoot, 'malicious')
-  fs.cpSync(root, maliciousRoot, { recursive: true })
+  copyReleaseShapedTree(maliciousRoot)
   const maliciousManifestPath = path.join(
     maliciousRoot,
     'system',
@@ -329,7 +342,7 @@ try {
 
   const deletionRoot = path.join(updateFixtureRoot, 'deletion')
   const deletionCheckpoint = path.join(updateFixtureRoot, 'deletion-checkpoint')
-  fs.cpSync(root, deletionRoot, { recursive: true })
+  copyReleaseShapedTree(deletionRoot)
   fs.rmSync(path.join(deletionRoot, 'system', 'workflows', 'deepen.md'))
   const deletionPlan = planUpdate(currentRoot, deletionRoot)
   assert.ok(deletionPlan.deletes.includes('system/workflows/deepen.md'))
@@ -355,7 +368,7 @@ try {
     updateFixtureRoot,
     'partial-failure-checkpoint',
   )
-  fs.cpSync(root, partialFailureRoot, { recursive: true })
+  copyReleaseShapedTree(partialFailureRoot)
   fs.writeFileSync(
     path.join(partialFailureRoot, 'README.md'),
     `${originalReadme}\n<!-- partial failure fixture -->\n`,
@@ -398,7 +411,7 @@ const packagingProofRoot = fs.mkdtempSync(
 try {
   const personalizedRoot = path.join(packagingProofRoot, 'personalized')
   const stagedRoot = path.join(packagingProofRoot, 'staged')
-  fs.cpSync(root, personalizedRoot, { recursive: true })
+  copyReleaseShapedTree(personalizedRoot)
   const privateMarker = 'PRIVATE_PERSONALIZED_MARKER'
   fs.writeFileSync(
     path.join(personalizedRoot, 'you', 'ABOUT.md'),
@@ -461,6 +474,51 @@ for (const workflow of [
   assert.ok(fs.existsSync(path.join(root, 'system/workflows', workflow)))
 }
 pass('Complete 1.0 workflow chain exists from discovery through improvement')
+
+// Version gating: a stable build is only the pinned last stable release,
+// VERSION.md carries exactly one Version and Status line, unsafe manifest paths
+// fail validation, and public packaging refuses a pre-release.
+const gateParent = fs.mkdtempSync(path.join(os.tmpdir(), 'home-base-version-gate-'))
+try {
+  const runIn = (treeRoot, script, extra = []) => spawnSync(process.execPath, [path.join(treeRoot, 'system', script), ...extra], { cwd: treeRoot, encoding: 'utf8' })
+  const gateTree = (name, mutate) => {
+    const treeRoot = path.join(gateParent, name)
+    copyReleaseShapedTree(treeRoot)
+    mutate(treeRoot)
+    return treeRoot
+  }
+  const setVersion = (treeRoot, version, status, extraLines = '') => {
+    const manifestPath = path.join(treeRoot, 'system', 'release-manifest.json')
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    manifest.version = version
+    manifest.releaseId = `home-base-${version}`
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+    const versionPath = path.join(treeRoot, 'VERSION.md')
+    const text = fs.readFileSync(versionPath, 'utf8')
+      .replace(/^- Version: .*$/m, `- Version: \`${version}\``)
+      .replace(/^- Status: .*$/m, `- Status: ${status}${extraLines}`)
+    fs.writeFileSync(versionPath, text)
+  }
+  const unpinned = gateTree('unpinned-stable', (treeRoot) => setVersion(treeRoot, '1.7.3', 'public stable release'))
+  assert.match(runIn(unpinned, 'validate.mjs').stderr, /VERSION\.md must identify the manifest version/, 'an arbitrary 1.x.y must not validate as stable')
+  const doubled = gateTree('double-status', (treeRoot) => setVersion(treeRoot, '1.1.0-dev.4', 'pre-release', '\n- Status: public stable release'))
+  assert.match(runIn(doubled, 'validate.mjs').stderr, /VERSION\.md must identify the manifest version/, 'two Status lines must not validate')
+  const unsafe = gateTree('unsafe-manifest', (treeRoot) => {
+    const manifestPath = path.join(treeRoot, 'system', 'release-manifest.json')
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    manifest.maintainedPaths.push('x/../instance')
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+  })
+  assert.match(runIn(unsafe, 'validate.mjs').stderr, /unsafe for the update engine/, 'an unsafe manifest path must not validate')
+  const prerelease = gateTree('public-prerelease', (treeRoot) => setVersion(treeRoot, '1.1.0-dev.9', 'pre-release'))
+  const refused = runIn(prerelease, 'package.mjs', ['--public-release', '--output', path.join(gateParent, 'home-base-1.1.0-dev.9.tgz')])
+  assert.notEqual(refused.status, 0)
+  assert.match(refused.stderr, /refuses pre-release version/)
+  assert.equal(fs.existsSync(path.join(gateParent, 'home-base-1.1.0-dev.9.tgz')), false)
+} finally {
+  fs.rmSync(gateParent, { recursive: true, force: true })
+}
+pass('Stable builds are pinned to the last stable release, VERSION.md has one Version and Status line, unsafe manifest paths fail, and public packaging refuses pre-releases')
 
 console.log(`Home Base proof passed (${checks.length} checks):`)
 for (const check of checks) console.log(`- ${check}`)

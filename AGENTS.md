@@ -6,16 +6,32 @@ Home Base is the user’s durable AI workspace. Treat the user as a person tryin
 
 1. Read `you/SETUP.md`.
 2. Read `system/WORKSPACE-CONTRACT.md`.
-3. If `system/distribution/release.json` exists and
-   `.home-base/state/update-state.json` does not, run
-   `node system/update.mjs init` before personalizing maintained files. Report
-   success or the exact failure; do not fabricate an update base.
+3. If `.home-base/state/update-state.json` does not exist, initialize the
+   update base before personalizing maintained files:
+   - If `system/distribution/release.json` exists (a downloaded release), run
+     `node system/update.mjs init`.
+   - Otherwise this is usually a Git clone. If `git status --porcelain` prints
+     nothing, run `node system/update.mjs init --source-commit <git rev-parse HEAD>
+     --source-ref <current branch or tag> --source-repository <clean remote URL>`.
+     For the clean remote URL, take `git remote get-url origin` and remove any
+     user name, password, or token (everything between `://` and `@`) before
+     using it; never write, print, or pass a URL that contains one (the updater
+     refuses it). Leave out `--source-repository` when there is no remote.
+   - If the clone has uncommitted changes, or the folder is neither a release
+     nor a Git clone, tell the user in plain words that safe updates are not
+     set up yet and why, and continue without them.
+   If update state already exists, `.home-base/state/staging/` is not empty,
+   and `.home-base/state/recovery.json` does not exist, an older updater (the
+   first update from 1.0.x) left a full copy of the folder there. Tell the
+   user, and with their go-ahead run `node system/update.mjs init` once so it
+   is removed.
+   Report success or the exact failure; do not fabricate an update base.
 4. If setup is `not_started`, or the user says “start,” “get me started,” or equivalent, read and follow `system/workflows/start.md`.
 5. If setup is `in_progress`, offer to continue at the recorded next question before doing unrelated setup work.
 6. Otherwise, load only the profile, work, opportunity, system, memory, project,
    knowledge, skill, capability, idea, and tool files relevant to the request.
    Start with the applicable index.
-6. Before enabling tools, controlling a browser/computer, changing outside
+7. Before enabling tools, controlling a browser/computer, changing outside
    state, creating a new interface, or preparing deployment, read
    `system/workflows/enter-build-mode.md` and `system/SAFETY.md`.
 
@@ -52,6 +68,12 @@ Home Base is the user’s durable AI workspace. Treat the user as a person tryin
   `system/workflows/inspect-capabilities.md`
 - “Enter Build Mode,” “use Chrome,” “set this up for me,” or any proposed
   external execution → `system/workflows/enter-build-mode.md`
+- “Open my dashboard,” “show my Home Base,” or equivalent → ask before
+  starting it, then run `node system/dashboard/serve.mjs` in the background
+  (see “For assistants” in `system/dashboard/README.md`). Give the user the
+  exact `http://127.0.0.1:<port>/#key=…` address it prints, once (never
+  rewrite it as `localhost`), and tell them how to stop it. If permission is
+  denied, ask the user to run the command in their own Terminal window.
 - “Does this need an app/dashboard/site?” or “deploy this” →
   `system/workflows/review-interface-and-deployment.md`
 - “Make this system better,” “what did we learn?”, or a system/project
@@ -72,6 +94,21 @@ not fit in the host’s initial summary; explicit `$skill-name` invocation still
 uses the installed package. Do not confuse bundled Skills with installed
 plugins, configured connectors, authenticated accounts, or permission to act.
 
+## Private instance zone
+
+- `instance/` is the user’s private overlay: their own configuration, private
+  dashboard modules, private skills in `instance/skills/`, images, or tools.
+  Updates never package, change, copy, or delete it, and Git ignores it. Read
+  it only when the request needs it, and never copy its contents into
+  maintained files or anything public.
+- `node system/instance-skills.mjs` previews linking private skills into
+  `~/.claude/skills` and `~/.agents/skills`, and `--remove` previews removing
+  those links. Adding `--apply` writes into or deletes from the home folder,
+  which is an outside action: show the preview and get the user’s approval at
+  that moment.
+- Before rolling back to a release older than 1.1, follow “Rollback across the
+  instance boundary” in `system/UPDATE-GUIDE.md`.
+
 ## Boundaries
 
 - You may organize and draft within this folder.
@@ -83,5 +120,9 @@ plugins, configured connectors, authenticated accounts, or permission to act.
 - Refuse passwords, recovery codes, private keys, authentication tokens,
   payment details, and other credential-shaped input. Do not repeat or write
   the value. Tell the user to sign in directly on the provider’s surface.
+- One exception: the `#key=…` in the address the local dashboard prints is
+  this computer’s own dashboard sign-in, not an account credential, and it
+  works only on `127.0.0.1`. Hand the user that printed address once in chat.
+  Never write it into any file, memory, note, or index.
 - Never store secret values or highly sensitive records here.
 - Do not rely on agent-native memory alone for information the user expects to carry between tools. Propose an appropriate Home Base file instead.
