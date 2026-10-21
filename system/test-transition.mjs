@@ -4,7 +4,7 @@
 // history and the v1.0.1 tag, so it is not part of the package proof.
 //
 // It packages 1.0.1 from tag v1.0.1, the release from the committed HEAD
-// ("dev1" below: 1.1.0, or a 1.1.0-dev.N pre-release) with a planted ignored
+// ("dev1" below: for example 1.2.0, or a 1.2.0-dev.N pre-release) with a planted ignored
 // file and a planted instance/ folder that must not ship, and the next
 // pre-release as a variant ("dev2"), all in temporary clones. Then it proves the
 // ordered transition: the 1.0.1 updater installs dev1 while instance/ holds
@@ -21,6 +21,12 @@
 // whose restore the 1.0.1 proof refused) and repairs it with the new release's
 // `update.mjs recover --root`, which refuses, changing nothing, when a
 // maintained file was hand-edited.
+//
+// When HEAD is newer than 1.1.0 it also packages 1.1.0 from tag v1.1.0 and
+// installs the new release with the 1.1.0 updater on a personalized, Git-kept
+// 1.1.0 whose instance/ holds a dashboard theme (theme.json and theme.css),
+// then rolls back and updates again, keeping every user file and instance/
+// byte-identical.
 //
 // Usage: node system/test-transition.mjs [--work-dir /absolute/folder]
 // With --work-dir the fixtures are kept there for inspection.
@@ -201,6 +207,19 @@ function populateInstance(root) {
   fs.writeFileSync(path.join(instance, 'assets', 'avatar.png'), Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'))
   fs.writeFileSync(path.join(instance, 'config.json'), `${JSON.stringify({ owner: 'fictional', marker: MARKER }, null, 2)}\n`)
   fs.writeFileSync(path.join(instance, 'NOTES.md'), `[broken link](missing.md) ${MARKER}\n`)
+  // A dashboard theme (from 1.2): a preset under a made-up name, plus theme.css.
+  fs.mkdirSync(path.join(instance, 'dashboard'), { recursive: true })
+  const calm = JSON.parse(fs.readFileSync(path.join(homeBaseRoot, 'system', 'dashboard', 'themes', 'calm.json'), 'utf8'))
+  fs.writeFileSync(path.join(instance, 'dashboard', 'theme.json'), `${JSON.stringify({ ...calm, name: 'Fixture river' }, null, 2)}\n`)
+  fs.writeFileSync(path.join(instance, 'dashboard', 'theme.css'), `/* fixture theme ${MARKER} */\n:root { --radius: 18px; }\n`)
+}
+
+// What the installed dashboard makes of instance/dashboard/theme.json.
+function installedTheme(root) {
+  const realRoot = fs.realpathSync(root)
+  const script = `import { readTheme } from ${JSON.stringify(path.join(realRoot, 'system', 'dashboard', 'lib', 'theme.mjs'))}; const t = readTheme(${JSON.stringify(realRoot)}); console.log(JSON.stringify({ state: t.state, name: t.name, customCss: t.customCss }))`
+  const result = run(process.execPath, ['--input-type=module', '-e', script], { cwd: realRoot })
+  try { return JSON.parse(result.stdout) } catch { return { state: 'unreadable', out: result.out } }
 }
 
 // Invented content only. Every user-owned folder gets a file of the user's own,
@@ -329,7 +348,7 @@ try {
   fs.writeFileSync(path.join(dev1Source, 'instance', 'README.md'), `${MARKER}\n`)
   const dev1Version = version(dev1Source)
   const dev1 = packageRelease(dev1Source, dev1Version)
-  check(/^1\.1\.\d+(?:-dev\.\d+)?$/.test(dev1Version), `packaged ${dev1Version} from committed HEAD ${headCommit.slice(0, 12)}`)
+  check(/^1\.(?:[1-9]\d*)\.\d+(?:-dev\.\d+)?$/.test(dev1Version), `packaged ${dev1Version} from committed HEAD ${headCommit.slice(0, 12)}`)
   check(dev1.log.includes('Excluded 1 untracked or ignored file(s) inside maintained paths'), 'packager reports the planted ignored file as excluded', dev1.log)
   const dev1Entries = archiveEntries(dev1.output)
   const dev1Bytes = gunzipSync(fs.readFileSync(dev1.output))
@@ -532,6 +551,43 @@ try {
     `repair removes the staging copy of the user's files and leaves user files and instance/ byte-identical ${JSON.stringify(afterRepair)}`)
   const unstuck = update(stuck, dev1Candidate)
   check(unstuck.status === 0 && version(stuck) === dev1Version && userFilesHash(stuck) === stuckUser, `the repaired install updates to ${dev1Version} with the 1.0.1 updater`, unstuck.out)
+
+  // ---- a personalized 1.1.0 install with a dashboard theme in instance/
+  if (/^1\.1\.0(?:$|-)/.test(dev1Version)) {
+    console.log('NOTE HEAD is 1.1.0 or a 1.1.0 pre-release; the 1.1.0 -> new release check does not apply.')
+  } else if (run('git', ['-C', repositoryRoot, 'rev-parse', '--verify', '--quiet', 'v1.1.0^{commit}']).status !== 0) {
+    check(false, 'the v1.1.0 tag is needed to check the update from 1.1.0')
+  } else {
+    packageRelease(cloneAt('1.1.0', 'v1.1.0'), '1.1.0')
+    check(true, 'packaged 1.1.0 from tag v1.1.0')
+    const eleven = extract('1.1.0', path.join(base, 'from-1.1.0'))
+    check(hb(eleven, ['init']).status === 0, 'init a 1.1.0 install')
+    personalize(eleven)
+    addMessyUserFiles(eleven)
+    populateInstance(eleven)
+    const elevenUser = userFilesHash(eleven)
+    const elevenInstance = treeHash(path.join(eleven, 'instance'))
+    const elevenValidate = validate(eleven)
+    check(elevenValidate.status === 0, 'the 1.1.0 validator passes on the personalized install with messy files and a dashboard theme in instance/', elevenValidate.out)
+    const preview = hb(eleven, ['preview', '--candidate', dev1Candidate])
+    check(preview.status === 0 && preview.json !== null, `the 1.1.0 updater's preview of ${dev1Version} arrives whole through a pipe (${preview.stdout.length} bytes)`, preview.out)
+    const e1 = update(eleven, dev1Candidate)
+    check(e1.status === 0 && version(eleven) === dev1Version, `the 1.1.0 updater installs ${dev1Version} on a personalized, Git-tracked install`, e1.out)
+    check(userFilesHash(eleven) === elevenUser && treeHash(path.join(eleven, 'instance')) === elevenInstance, 'user files and instance/ (theme included) byte-identical after the update')
+    const afterEleven = hiddenCopies(eleven)
+    check(clean(afterEleven), `no staging, journal-old, instance, or user-owned copies after the update ${JSON.stringify(afterEleven)}`)
+    const elevenNewValidate = validate(eleven)
+    const elevenProof = run(process.execPath, [path.join(eleven, 'system', 'prove.mjs')], { cwd: eleven })
+    check(elevenNewValidate.status === 0 && elevenProof.status === 0, `${dev1Version} validate and prove pass with cwd = the updated install`, `${elevenNewValidate.out}\n${elevenProof.out}`)
+    const theme = installedTheme(eleven)
+    check(theme.state === 'applied' && theme.name === 'Fixture river' && theme.customCss === true, `the ${dev1Version} dashboard applies the kept theme.json and theme.css ${JSON.stringify(theme)}`)
+    const er = rollback(eleven, e1.tx)
+    check(er.status === 0 && version(eleven) === '1.1.0' && state(eleven).activeTransactionId === null, `rollback ${dev1Version} -> 1.1.0 without parking instance/`, er.out)
+    check(userFilesHash(eleven) === elevenUser && treeHash(path.join(eleven, 'instance')) === elevenInstance && clean(hiddenCopies(eleven)), 'user files and instance/ byte-identical, no hidden copies, after rollback')
+    const e2 = update(eleven, dev1Candidate)
+    check(e2.status === 0 && version(eleven) === dev1Version && userFilesHash(eleven) === elevenUser && treeHash(path.join(eleven, 'instance')) === elevenInstance,
+      `the 1.1.0 updater installs ${dev1Version} again after the rollback; user files and instance/ byte-identical`, e2.out)
+  }
 } catch (error) {
   failures += 1
   console.log(`FAIL ${error.message}`)
