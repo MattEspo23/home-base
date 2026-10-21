@@ -35,8 +35,10 @@ never changed by an update.
   `instance/dashboard/` (`theme.json`, and `theme.css` if you want more),
   which updates never touch. Colours that would be hard to read keep the
   default, and a theme the dashboard cannot use is skipped with a note at the
-  bottom of the page. If you do nothing, the dashboard looks exactly as it
-  did in 1.1.0. See “Make it yours” in
+  bottom of the page. A look is made from colours, fonts already on your
+  computer, and shapes; pictures and font files cannot be added, because the
+  page loads nothing it was not built with. If you do nothing, the dashboard
+  looks exactly as it did in 1.1.0. See “Make it yours” in
   [the dashboard guide](./system/dashboard/README.md).
 - **Your dashboard on your phone (optional).** Say “put my dashboard online”
   and your assistant walks you through putting a copy of the dashboard's own
@@ -45,16 +47,17 @@ never changed by an update.
   sign in yourself; your assistant never sees a Vercel password or token.
   Your assistant first asks which Vercel account or team to use and uses
   only the one you name, so a work team (whose members could open it) is
-  never picked by accident. A harmless placeholder goes up first, and your
-  copy follows only after
-  `node system/dashboard/publish.mjs --check-locked` confirms that Vercel asks
-  for a sign-in on every address. What goes online is the page, your theme,
-  your private dashboard modules (their code too), and the names and counts
-  the dashboard already shows, never the Home Base folder. Every file is
+  never picked by accident. A harmless placeholder goes up first. Your copy
+  is built only after `node system/dashboard/publish.mjs --check-locked`
+  confirms that Vercel asks for a sign-in on every address; the tool itself
+  refuses to build it without a passing check from the last 30 minutes.
+  What goes online is the page, your theme, your private dashboard modules
+  (their code and any data in their files), and the names and counts the
+  dashboard already shows, never the Home Base folder. Every file is
   listed before upload, and links or anything that looks like a password,
   key, email address, phone or card number, or a folder path from your
-  computer are refused. Say “update my online dashboard” after changes, or
-  “take it down” to delete it. See
+  computer are refused. Say “update my online dashboard” after changes (each
+  update asks you first), or “take it down” to delete it. See
   [Put the dashboard online](./system/workflows/put-the-dashboard-online.md).
 - **Two new skills**, `style-home-base-dashboard` and
   `publish-home-base-dashboard`, so the release now has 42 repository Skills

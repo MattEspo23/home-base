@@ -152,11 +152,14 @@ a preset when one is close, and rebuilds nothing unless the app itself changes.
 Quiet safety nets:
 
 - Text that would be hard to read keeps the default colour, and the footer
-  says which.
+  says which. If you change the background, choose the success, warning, and
+  danger colours too: when a default one is hard to read on your background,
+  the default background comes back.
 - A `theme.json` the dashboard cannot use is skipped, and the footer says why.
 - The page loads nothing from the internet because it shows private things,
-  so it uses fonts already on your computer, and styles and images stay in
-  your files.
+  so it uses fonts already on your computer. Pictures (a logo or a photo) and
+  font files cannot be used: the page blocks them, so a look is made from
+  colours, installed fonts, and shapes.
 
 ### theme.json settings
 

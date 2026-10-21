@@ -31,6 +31,11 @@ import { THEME_CSS_FILE, THEME_FILE, readCustomCss, readTheme } from './theme.mj
 export const VERCEL_CLI = 'vercel@62.1.0'
 export const MANIFEST = 'ONLINE-MANIFEST.json'
 export const VERCEL_IGNORE = '.vercelignore'
+// Written into the output folder by a passing --check-locked, and used up by
+// the next real copy. Stays on this computer (the .vercelignore allowlist
+// never lists it).
+export const LOCK_RECORD = 'LOCK-CHECK.json'
+export const LOCK_RECORD_MAX_AGE_MS = 30 * 60 * 1000
 // Made by the Vercel CLI when it links a folder to a project. Kept, never
 // uploaded (the .vercelignore allowlist leaves them out), and never read here.
 const CLI_ENTRIES = new Set(['.vercel', '.gitignore'])
@@ -336,7 +341,7 @@ export function prepareOutput(outDir, realRoot, { requireManifest = false } = {}
     throw new PublishRefused(['this folder has not been set up yet: build the placeholder here first and check the lock (see system/workflows/put-the-dashboard-online.md)'])
   }
   if (given) {
-    const known = new Set([...(previous?.files ?? []).map((item) => item?.path), ...(previous ? [MANIFEST, VERCEL_IGNORE] : [])].filter((item) => typeof item === 'string'))
+    const known = new Set([...(previous?.files ?? []).map((item) => item?.path), ...(previous ? [MANIFEST, VERCEL_IGNORE, LOCK_RECORD] : [])].filter((item) => typeof item === 'string'))
     const unknown = unknownEntries(realOut, known)
     if (unknown.length) {
       const shown = unknown.slice(0, 5).join(', ')
@@ -348,7 +353,7 @@ export function prepareOutput(outDir, realRoot, { requireManifest = false } = {}
 
 function removePrevious(realOut, previous) {
   if (!previous) return
-  const names = [...previous.files.map((item) => item.path), VERCEL_IGNORE, MANIFEST]
+  const names = [...previous.files.map((item) => item.path), VERCEL_IGNORE, MANIFEST, LOCK_RECORD]
   for (const name of names) {
     if (typeof name !== 'string' || name.split('/').some((part) => part === '' || part === '.' || part === '..')) continue
     const target = path.join(realOut, ...name.split('/'))
@@ -369,9 +374,10 @@ function removePrevious(realOut, previous) {
   }
 }
 
-// Writes the files, the .vercelignore allowlist (only these files can be
-// uploaded, even if something else appears in the folder later), and the
-// manifest. Returns the manifest.
+// Writes the files, the .vercelignore allowlist (only the top-level files and
+// folders written here can be uploaded; publish.mjs refuses stray files the
+// next time it runs), and the manifest. Any lock record is used up. Returns
+// the manifest.
 export function writeOutput(realOut, previous, files, { kind, createdAt }) {
   fs.mkdirSync(realOut, { recursive: true, mode: 0o700 })
   removePrevious(realOut, previous)
@@ -394,10 +400,47 @@ export function writeOutput(realOut, previous, files, { kind, createdAt }) {
     createdAt,
     vercelCli: VERCEL_CLI,
     files: listed.map((name) => ({ path: name, bytes: files.get(name).length, sha256: crypto.createHash('sha256').update(files.get(name)).digest('hex') })),
-    localOnly: [VERCEL_IGNORE, MANIFEST],
+    localOnly: [VERCEL_IGNORE, MANIFEST, LOCK_RECORD],
   }
   fs.writeFileSync(path.join(realOut, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`)
   return manifest
+}
+
+// ------------------------------------------------------------ lock record
+
+// After a passing lock check: notes in the output folder (which must already
+// hold this tool's files) which addresses passed, and when.
+export function recordLockCheck(outDir, realRoot, origins, now = new Date()) {
+  const { realOut } = prepareOutput(outDir, realRoot, { requireManifest: true })
+  fs.writeFileSync(path.join(realOut, LOCK_RECORD), `${JSON.stringify({ schemaVersion: 1, checkedAt: now.toISOString(), addresses: origins }, null, 2)}\n`)
+  return realOut
+}
+
+// After a failed lock check: an older record no longer counts.
+export function clearLockRecord(outDir, realRoot) {
+  const { realOut } = prepareOutput(outDir, realRoot, { requireManifest: true })
+  const target = path.join(realOut, LOCK_RECORD)
+  if (lstat(target)?.isFile()) fs.rmSync(target)
+}
+
+// The real copy is written only into a folder the placeholder was uploaded
+// from (the Vercel CLI linked it: .vercel/project.json) and only within 30
+// minutes after a lock check passed for that folder.
+export function requireLockCheck(realOut, now = new Date()) {
+  const reasons = []
+  if (!lstat(path.join(realOut, '.vercel'))?.isDirectory() || !lstat(path.join(realOut, '.vercel', 'project.json'))?.isFile()) {
+    reasons.push('the placeholder has not been uploaded from this folder yet; upload it and turn on the lock first (see system/workflows/put-the-dashboard-online.md)')
+  }
+  const recordPath = path.join(realOut, LOCK_RECORD)
+  let checkedAt = Number.NaN
+  if (lstat(recordPath)?.isFile()) {
+    try { checkedAt = Date.parse(JSON.parse(fs.readFileSync(recordPath, 'utf8')).checkedAt) } catch { checkedAt = Number.NaN }
+  }
+  const age = now.getTime() - checkedAt
+  if (!Number.isFinite(checkedAt) || age < -60_000 || age > LOCK_RECORD_MAX_AGE_MS) {
+    reasons.push('check the lock first: node system/dashboard/publish.mjs --check-locked <production address> <deployment address> --out <this folder> must pass within the 30 minutes before the real copy is built')
+  }
+  if (reasons.length) throw new PublishRefused(reasons)
 }
 
 // ------------------------------------------------------------ lock check
@@ -407,6 +450,9 @@ export const PROBE_PATHS = ['/', '/index.html', '/status.json', '/app/main.js']
 // Text that appears only in Home Base's own pages and data.
 const HOME_BASE_MARKERS = ['home-base-mode', 'data-home-base-placeholder', '"schemaVersion"', 'Home Base']
 const LOGIN_PATHS = [/^\/login(?:\/|$)/, /^\/sso-api(?:\/|$)/, /^\/sso(?:\/|$)/]
+// Vercel's firewall or bot protection, not its sign-in: such an answer can
+// refuse this check while a browser is let through.
+const MITIGATED = 'x-vercel-mitigated'
 
 function fromVercel(headers) {
   if (/vercel/i.test(headers.get('server') ?? '')) return true
@@ -448,6 +494,10 @@ export async function probe(url, { timeoutMs = 15_000 } = {}) {
     return { ok: false, status: null, why: 'could not be reached' }
   }
   const { status } = response
+  if (response.headers.has(MITIGATED)) {
+    await response.body?.cancel().catch(() => {})
+    return { ok: false, status, why: 'a Vercel firewall or bot check answered, not the Vercel sign-in' }
+  }
   if (status >= 300 && status < 400) {
     await response.body?.cancel().catch(() => {})
     let target = null
@@ -459,11 +509,14 @@ export async function probe(url, { timeoutMs = 15_000 } = {}) {
   }
   const body = await readSome(response).catch(() => '')
   if (HOME_BASE_MARKERS.some((marker) => body.includes(marker))) return { ok: false, status, why: 'answered with Home Base content without a sign-in' }
-  if (status === 401 || status === 403) {
+  // Vercel Authentication answers an anonymous request with 401. A 403 can
+  // come from a firewall or bot rule that lets browsers through, so it fails.
+  if (status === 401) {
     return fromVercel(response.headers)
       ? { ok: true, status, why: 'Vercel asks for a sign-in' }
       : { ok: false, status, why: 'refused, but not with Vercel’s sign-in' }
   }
+  if (status === 403) return { ok: false, status, why: 'refused without asking for a sign-in (a firewall or bot rule can do this while browsers get through)' }
   return { ok: false, status, why: status >= 200 && status < 300 ? 'answered without a sign-in' : 'did not ask for a Vercel sign-in' }
 }
 

@@ -13,8 +13,8 @@ import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { freePort } from './lib/chrome.mjs'
 import {
-  MANIFEST, PROBE_PATHS, PublishRefused, VERCEL_CLI, VERCEL_IGNORE, buildPlaceholder, buildSnapshot, checkLocked,
-  lockCheckOrigin, onlinePolicy, prepareOutput, scanFiles, staticPage, writeOutput,
+  LOCK_RECORD, MANIFEST, PROBE_PATHS, PublishRefused, VERCEL_CLI, VERCEL_IGNORE, buildPlaceholder, buildSnapshot, checkLocked,
+  clearLockRecord, lockCheckOrigin, onlinePolicy, prepareOutput, recordLockCheck, requireLockCheck, scanFiles, staticPage, writeOutput,
 } from './lib/online.mjs'
 import { SECURITY_HEADERS } from './lib/server.mjs'
 import { readStatus, resolveHomeBase } from './lib/status.mjs'
@@ -272,7 +272,6 @@ const VERCEL_401 = { status: 401, headers: { server: 'Vercel', 'content-type': '
 test('the lock check passes on Vercel’s 401 and on a redirect to its sign-in, with no cookies sent', async () => {
   for (const answer of [
     () => VERCEL_401,
-    () => ({ status: 403, headers: { 'x-vercel-id': 'iad1::abc' } }),
     () => ({ status: 302, headers: { location: 'https://vercel.com/login?next=%2Fsso-api' } }),
     () => ({ status: 307, headers: { location: 'https://vercel.com/sso-api?url=x&nonce=y' } }),
   ]) {
@@ -299,6 +298,11 @@ test('the lock check fails on any answer that is not Vercel’s sign-in wall', a
     ['a redirect to a look-alike host', () => ({ status: 302, headers: { location: 'https://vercel.com.evil.example/login' } })],
     ['a redirect to another Vercel page', () => ({ status: 302, headers: { location: 'https://vercel.com/home-base-dashboard' } })],
     ['a 404', () => ({ status: 404, headers: { server: 'Vercel' } })],
+    // A firewall or bot rule can refuse this check while browsers get through.
+    ['a Vercel 403 without a sign-in', () => ({ status: 403, headers: { server: 'Vercel', 'x-vercel-id': 'iad1::abc' } })],
+    ['a 403 bot challenge', () => ({ status: 403, headers: { server: 'Vercel', 'x-vercel-mitigated': 'challenge' }, body: 'Vercel Security Checkpoint' })],
+    ['a 401 marked as a firewall answer', () => ({ ...VERCEL_401, headers: { ...VERCEL_401.headers, 'x-vercel-mitigated': 'deny' } })],
+    ['a redirect to the sign-in marked as a firewall answer', () => ({ status: 307, headers: { location: 'https://vercel.com/sso-api?url=x', 'x-vercel-mitigated': 'challenge' } })],
   ]
   for (const [label, answer] of failing) {
     const host = await fakeHost(answer)
@@ -350,18 +354,69 @@ test('the command lists every file that will go online, and refuses plainly', ()
   assert.match(first.stdout, new RegExp(`npx --yes ${VERCEL_CLI.replace('.', '\\.')} deploy --cwd`))
   // Every printed upload names the team or account the user chose, never the CLI's default.
   assert.match(first.stdout, /deploy --cwd "[^"]+" --prod --yes --scope <scope>$/m)
+  // The real copy needs the placeholder uploaded from this folder (the Vercel
+  // CLI's link file) and a lock check recorded here in the last 30 minutes.
+  const unchecked = run('--out', out)
+  assert.equal(unchecked.status, 1)
+  assert.match(unchecked.stderr, /placeholder has not been uploaded from this folder/)
+  assert.match(unchecked.stderr, /check the lock first/)
+  write(out, '.vercel/project.json', '{ "projectId": "prj_fixture", "orgId": "team_fixture" }\n')
+  const stillUnchecked = run('--out', out)
+  assert.equal(stillUnchecked.status, 1)
+  assert.ok(!/placeholder has not been uploaded/.test(stillUnchecked.stderr))
+  assert.match(stillUnchecked.stderr, /check the lock first/)
+  recordLockCheck(out, root, ['https://fixture.vercel.app'])
   const second = run('--out', out)
   assert.equal(second.status, 0, second.stderr)
+  assert.ok(!fs.existsSync(path.join(out, LOCK_RECORD)), 'the record is used up')
+  assert.match(second.stdout, /--check-locked <production address> <new deployment address> --out "/)
   assert.match(second.stdout, /These files will go online:/)
   assert.match(second.stdout, /status\.json/)
   assert.match(second.stdout, /deploy --cwd "[^"]+" --prod --yes --scope <scope>$/m)
   assert.match(second.stdout, /instance-modules\/reading\/index\.js/)
   assert.ok(!second.stdout.includes(SENTINEL))
+  const again = run('--out', out)
+  assert.equal(again.status, 1, 'each real copy needs its own lock check')
+  assert.match(again.stderr, /check the lock first/)
+  const mixed = run('--check-locked', 'https://fixture.vercel.app', '--placeholder')
+  assert.equal(mixed.status, 2)
   const inside = run('--out', path.join(root, 'online'))
   assert.equal(inside.status, 1)
   assert.match(inside.stderr, /inside your Home Base folder/)
   assert.ok(!fs.existsSync(path.join(root, 'online')))
   assert.equal(spawnSync(process.execPath, [publishScript, '--bogus'], { encoding: 'utf8' }).status, 2)
+})
+
+test('a lock check is recorded only in a folder this tool set up, expires, and never goes online', () => {
+  const root = fixture()
+  const out = path.join(scratch, 'out-lock-record')
+  refusedWith(() => recordLockCheck(out, root, ['https://fixture.vercel.app']), /build the placeholder here first/)
+  placeholder(root, out)
+  write(out, '.vercel/project.json', '{}\n')
+  const realOut = fs.realpathSync(out)
+  const now = new Date('2026-10-21T12:00:00.000Z')
+  recordLockCheck(out, root, ['https://fixture.vercel.app'], now)
+  const record = JSON.parse(fs.readFileSync(path.join(out, LOCK_RECORD), 'utf8'))
+  assert.deepEqual(record, { schemaVersion: 1, checkedAt: now.toISOString(), addresses: ['https://fixture.vercel.app'] })
+  assert.doesNotThrow(() => requireLockCheck(realOut, new Date(now.getTime() + 29 * 60_000)))
+  refusedWith(() => requireLockCheck(realOut, new Date(now.getTime() + 31 * 60_000)), /check the lock first/)
+  refusedWith(() => requireLockCheck(realOut, new Date(now.getTime() - 5 * 60_000)), /check the lock first/)
+  // A link in place of the record does not count.
+  fs.rmSync(path.join(out, LOCK_RECORD))
+  fs.writeFileSync(path.join(scratch, 'elsewhere.json'), JSON.stringify({ checkedAt: now.toISOString() }))
+  fs.symlinkSync(path.join(scratch, 'elsewhere.json'), path.join(out, LOCK_RECORD))
+  refusedWith(() => requireLockCheck(realOut, now), /check the lock first/)
+  fs.rmSync(path.join(out, LOCK_RECORD))
+  // A failed check clears an earlier pass.
+  recordLockCheck(out, root, ['https://fixture.vercel.app'], now)
+  clearLockRecord(out, root)
+  refusedWith(() => requireLockCheck(realOut, now), /check the lock first/)
+  // The record stays on this computer: the allowlist never lists it.
+  recordLockCheck(out, root, ['https://fixture.vercel.app'])
+  const manifest = snapshot(root, out)
+  assert.ok(!manifest.files.some((item) => item.path === LOCK_RECORD))
+  assert.ok(manifest.localOnly.includes(LOCK_RECORD))
+  assert.ok(!fs.readFileSync(path.join(out, VERCEL_IGNORE), 'utf8').includes(LOCK_RECORD))
 })
 
 test('the pinned Vercel CLI is an exact version', () => {

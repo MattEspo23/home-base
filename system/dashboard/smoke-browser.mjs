@@ -26,6 +26,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { findBrowser, freePort, openBrowser, startDashboard } from './lib/chrome.mjs'
+import { recordLockCheck } from './lib/online.mjs'
 
 const dashboardDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -157,10 +158,16 @@ async function main() {
   //     the theme and the module, and holds no key and no file bodies.
   write('instance/dashboard/theme.json', fs.readFileSync(path.join(dashboardDir, 'themes', 'soft.json')))
   const onlineDir = path.join(scratch, 'online', 'home-base-dashboard')
-  for (const args of [['--placeholder', '--out', onlineDir], ['--out', onlineDir]]) {
-    const run = spawnSync(process.execPath, [path.join(dashboardDir, 'publish.mjs'), '--home-base', home, ...args], { encoding: 'utf8' })
-    assert.equal(run.status, 0, run.stderr)
-  }
+  const publish = (args) => spawnSync(process.execPath, [path.join(dashboardDir, 'publish.mjs'), '--home-base', home, ...args], { encoding: 'utf8' })
+  const placed = publish(['--placeholder', '--out', onlineDir])
+  assert.equal(placed.status, 0, placed.stderr)
+  // Stand-ins for the placeholder upload (the Vercel CLI's link file) and a
+  // passing lock check; nothing here contacts Vercel.
+  fs.mkdirSync(path.join(onlineDir, '.vercel'))
+  fs.writeFileSync(path.join(onlineDir, '.vercel', 'project.json'), '{}\n')
+  recordLockCheck(onlineDir, fs.realpathSync(home), ['https://fixture.vercel.app'])
+  const copied = publish(['--out', onlineDir])
+  assert.equal(copied.status, 0, copied.stderr)
   fs.rmSync(path.join(home, 'instance/dashboard/theme.json'))
   const staticOrigin = await serveSnapshot(onlineDir)
   await page('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })

@@ -17,8 +17,13 @@ names and counts the dashboard already shows. `node
 system/dashboard/publish.mjs` lists every file before anything is uploaded
 and refuses links, other files in a module folder, and text that looks like
 a password, key, email address, phone or card number, or a folder path from
-this computer. Module code goes online too, so mention that once if the user
-has modules.
+this computer. Module files go online too, their code and any data in their
+`.json` files, so mention that once if the user has modules.
+
+Putting the dashboard online is an outside action. Follow
+`system/SAFETY.md`, and before the first upload give the user the Build Mode
+preview from `system/workflows/enter-build-mode.md` (the account and team,
+what goes online, who could open it, how to take it down).
 
 ## One-time setup
 
@@ -51,10 +56,13 @@ Say it plainly, then do it one step at a time:
    1. Upload the harmless placeholder:
       `node system/dashboard/publish.mjs --placeholder --out <folder>`, then
       `npx --yes vercel@62.1.0 deploy --cwd <folder> --prod --yes --scope <scope>`.
-      The first upload creates the project in that team or account; check
-      that the address it prints belongs to it before going on. Note the production address it prints (for
-      example `https://home-base-dashboard.vercel.app`) and the deployment
-      address on its last line.
+      The first upload creates the project in that team or account. The
+      deployment address it prints ends in `-<scope>.vercel.app`; if it does
+      not, stop and look at the project at vercel.com with the user. Note
+      the production address it shows (for example
+      `https://<project>.vercel.app`) and the deployment address on its last
+      line. Always use the addresses it printed, never one you guess: a
+      `.vercel.app` name may belong to someone else.
    2. Turn on the lock. Either the user does it at vercel.com: open the
       project, Settings, Deployment Protection, turn on Vercel
       Authentication, choose **All Deployments**, Save. Or, with their yes,
@@ -67,15 +75,17 @@ Say it plainly, then do it one step at a time:
       Standard Protection, leaves the production address open, so it is not
       enough.
    3. Check it: `node system/dashboard/publish.mjs --check-locked
-      <production address> <deployment address>`. It asks for the page, the
-      data, and a script without any sign-in and passes only if Vercel asks
-      for a sign-in every time.
+      <production address> <deployment address> --out <folder>`. It asks
+      for the page, the data, and a script without any sign-in and passes
+      only if Vercel asks for a sign-in every time. A pass is noted in the
+      folder; the real copy can be built there only in the next 30 minutes,
+      and only once per pass.
    4. Only then build the real copy:
       `node system/dashboard/publish.mjs --out <folder>`. Show the user the
       “These files will go online” list, then upload with the same deploy
       command.
    5. Check again with the production address and the new deployment
-      address.
+      address (`--check-locked … --out <folder>`).
 
 If a check fails at any point, stop. Put the placeholder back at once
 (`--placeholder --out <folder>`, then deploy `--prod`), tell the user what
@@ -92,15 +102,15 @@ Add to Home screen).
 ## Keeping it fresh
 
 After changes, the user says “update my online dashboard.” Run
-`--check-locked` on the production address first, then `--out <folder>`,
-show the list, deploy `--prod --scope <scope>` (the same team or account as
-before), and check the production and new deployment
-addresses again. Hobby allows 100 uploads a day.
+`--check-locked <production address> --out <folder>` first, then
+`--out <folder>`, show the list, and with the user’s yes deploy
+`--prod --scope <scope>` (the same team or account as before). Then check the
+production and new deployment addresses again. Hobby allows 100 uploads a
+day.
 
-At the end of the setup, offer once to do this automatically at the end of
-each session where Home Base changed. If they say yes, note it in
-`you/PREFERENCES.md`; that standing yes covers only this update to this
-project, and each run still checks the lock first and stops if it fails.
+At the end of a session where Home Base changed, you may offer once to update
+the online copy. Every update still needs the user’s yes at that moment,
+after they have seen the file list; an earlier yes does not carry over.
 
 ## Never
 

@@ -4,16 +4,18 @@
 // The steps are in system/workflows/put-the-dashboard-online.md.
 //
 //   node system/dashboard/publish.mjs --placeholder --out <folder>
-//   node system/dashboard/publish.mjs --check-locked <https address> [<https address> ...]
+//   node system/dashboard/publish.mjs --check-locked <https address> [<https address> ...] [--out <folder>]
 //   node system/dashboard/publish.mjs --out <folder> [--home-base <folder>]
 //
 // --placeholder writes a harmless "This Home Base is locked" page and reads
 // nothing from Home Base. --check-locked asks each address for the page, the
 // data, and an asset without any sign-in, and passes only when every answer is
-// Vercel's own sign-in wall. --out writes a static copy of exactly what the
-// local dashboard shows (names and counts, never file contents) into a folder
-// that already holds the placeholder, and lists every file that will go
-// online. The output folder must be outside the Home Base folder.
+// Vercel's own sign-in wall; with --out it records the pass in that folder.
+// --out writes a static copy of exactly what the local dashboard shows (names
+// and counts, never file contents) into a folder the placeholder was uploaded
+// from, only within 30 minutes after a passing check recorded there, and
+// lists every file that will go online. The output folder must be outside the
+// Home Base folder.
 //
 // This script never contacts Vercel and never uploads anything; the official
 // Vercel CLI does that. It never reads Vercel sign-in files or tokens.
@@ -35,11 +37,13 @@ const COMMAND = 'node system/dashboard/publish.mjs'
 const NPX = `npx --yes ${online.VERCEL_CLI}`
 const USAGE = `Usage:
   ${COMMAND} --placeholder --out <folder>
-  ${COMMAND} --check-locked <https address> [<https address> ...]
+  ${COMMAND} --check-locked <https address> [<https address> ...] [--out <folder>]
   ${COMMAND} --out <folder> [--home-base <folder>]
 
   --placeholder          write the harmless locked page (reads nothing from Home Base)
-  --check-locked         pass only if every address asks for a Vercel sign-in
+  --check-locked         pass only if every address asks for a Vercel sign-in;
+                         with --out, record the pass there (the real copy needs one
+                         from the last 30 minutes)
   --out <folder>         the folder to upload from, outside your Home Base folder
   --home-base <folder>   another Home Base folder (default: the one this file is in);
                          with --placeholder it only names the folder to stay out of`
@@ -66,9 +70,9 @@ function parseArguments(argv) {
     index += 1
   }
   if (options.checkLocked) {
-    if (options.placeholder || options.out || options.homeBase) throw new UsageError('--check-locked is used on its own')
+    if (options.placeholder) throw new UsageError('--check-locked is used without --placeholder')
     if (options.addresses.length === 0) throw new UsageError('--check-locked needs at least one https address')
-    if (options.addresses.some((address) => !online.lockCheckOrigin(address))) throw new UsageError('--check-locked takes https addresses only, such as https://home-base-dashboard.vercel.app')
+    if (options.addresses.some((address) => !online.lockCheckOrigin(address))) throw new UsageError('--check-locked takes https addresses only, such as https://<your-project>.vercel.app')
     return options
   }
   if (!options.out) throw new UsageError('--out <folder> is required')
@@ -91,13 +95,22 @@ function printList(manifest, realOut) {
   console.log(`They are in ${realOut}. Nothing has been uploaded.`)
 }
 
-async function runCheck(addresses) {
-  const { locked, results } = await online.checkLocked(addresses)
+async function runCheck(options) {
+  // Refuse a bad output folder before any request is made.
+  const realRoot = options.out ? homeBaseRoot(options.homeBase ?? path.resolve(dashboardDir, '..', '..')) : null
+  if (options.out) online.prepareOutput(options.out, realRoot, { requireManifest: true })
+  const { locked, results } = await online.checkLocked(options.addresses)
   for (const result of results) console.log(`  ${result.ok ? 'ok     ' : 'NOT OK '} ${result.url}  ${result.status ?? '---'}  ${result.why}`)
   if (locked) {
     console.log(`Locked: every address asked for a Vercel sign-in (${results.length} anonymous requests, no cookies).`)
+    if (options.out) {
+      const origins = options.addresses.map((address) => online.lockCheckOrigin(address))
+      const realOut = online.recordLockCheck(options.out, realRoot, origins)
+      console.log(`Recorded in ${realOut}: the real copy can be built there in the next 30 minutes.`)
+    }
     return 0
   }
+  if (options.out) online.clearLockRecord(options.out, realRoot)
   console.log('NOT LOCKED: at least one address did not ask for a Vercel sign-in.')
   console.log('Stop. Do not upload your dashboard. Put the placeholder back now:')
   console.log(`  ${COMMAND} --placeholder --out <folder>`)
@@ -117,7 +130,7 @@ async function main() {
   }
   if (options.help) { console.log(USAGE); return 0 }
   try {
-    if (options.checkLocked) return await runCheck(options.addresses)
+    if (options.checkLocked) return await runCheck(options)
     const realRoot = homeBaseRoot(options.homeBase ?? path.resolve(dashboardDir, '..', '..'))
     const createdAt = new Date()
     if (options.placeholder) {
@@ -132,6 +145,7 @@ async function main() {
       return 0
     }
     const { realOut, previous } = online.prepareOutput(options.out, realRoot, { requireManifest: true })
+    online.requireLockCheck(realOut, createdAt)
     const { files } = online.buildSnapshot(realRoot, { distDir: path.join(dashboardDir, 'dist'), now: createdAt })
     const reasons = online.scanFiles(files)
     if (reasons.length) throw new online.PublishRefused(reasons)
@@ -140,7 +154,7 @@ async function main() {
     console.log('status.json holds only the names and counts your dashboard shows, never file contents.')
     console.log('Upload only if --check-locked passed on this project:')
     console.log(`  ${NPX} deploy --cwd "${realOut}" --prod --yes --scope <scope>`)
-    console.log(`Then check again: ${COMMAND} --check-locked <production address> <new deployment address>`)
+    console.log(`Then check again: ${COMMAND} --check-locked <production address> <new deployment address> --out "${realOut}"`)
     return 0
   } catch (error) {
     if (!(error instanceof online.PublishRefused)) throw error

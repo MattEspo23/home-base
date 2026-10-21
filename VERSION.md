@@ -53,8 +53,9 @@
   start from a preset (`precise`, `soft`, `night`, `calm`); your theme lives
   in `instance/dashboard/` and hard-to-read colours keep the default
 - An optional locked online copy of the dashboard on your own Vercel account
-  (`node system/dashboard/publish.mjs`), uploaded only after a placeholder
-  proves that Vercel asks for a sign-in on every address
+  (`node system/dashboard/publish.mjs`): a harmless placeholder goes up first,
+  and your copy is built only after `--check-locked` confirms that Vercel asks
+  for a sign-in on every address
 
 ## Release boundary
 

@@ -53,11 +53,14 @@ user to reload their dashboard. Adjust until they are happy.
 Mention one only when it matters.
 
 - Text that would be hard to read keeps the default colour for that pair, and
-  the page footer says which.
+  the page footer says which. When you change the background, set success,
+  warning, and danger too, or a default one that is hard to read on it brings
+  the default background back.
 - A `theme.json` the dashboard cannot use is skipped, and the footer says why.
 - The page loads nothing from the internet, because it shows private things:
-  use fonts already on the computer and keep images and styles inside the
-  files.
+  use fonts already on the computer. Images (logos, photos, backgrounds) and
+  font files are blocked by the page, so build the look from colours,
+  installed fonts, and shapes, and say so if the user asks for a picture.
 - A screenshot of another product is inspiration: take its feel, not its
   logos, names, or images.
 

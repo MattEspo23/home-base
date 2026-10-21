@@ -42,8 +42,8 @@ This directory contains the maintained Home Base behavior.
   Vercel sign-in
 - `PROMOTION.md` — maintainer checklist for bringing private work into the
   public repository
-- `test-transition.mjs` — maintainer-only 1.0.1 → 1.1 transition, instance, and
-  rollback fixture (needs the Git history and tags; not part of the package proof)
+- `test-transition.mjs` — maintainer-only 1.0.1 → current and 1.1.0 → current
+  transition, instance, and rollback fixture (needs the Git history and tags; not part of the package proof)
 
 Files under `you/`, `work/`, `opportunities/`, `systems/`, `capabilities/`,
 `ideas/`, `memory/`, `knowledge/`, `projects/`, `skills/`, `tools/`, and
