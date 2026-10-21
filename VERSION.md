@@ -1,8 +1,8 @@
 # Home Base version
 
-- Version: `1.0.1`
+- Version: `1.1.0`
 - Status: public stable release
-- Updated: 2026-08-13
+- Updated: 2026-10-15
 
 ## Version-one support
 
@@ -33,11 +33,25 @@
 - Beginner installation guidance and a durable preference read in the
   executable two-run learning reference
 
+## Added in 1.1.0
+
+- A private `instance/` folder that updates, packages, and proofs never touch
+- A read-only local dashboard (`node system/dashboard/serve.mjs`)
+- Safer updates: smaller short-lived staging, a rollback stack, restores
+  confirmed by checkpoint hashes, updates that work on a personalized Home
+  Base, and a repair for an update left unfinished by a 1.0.x updater
+- A Capability Doctor that checks Codex, Claude Code, and Grok Build
+  separately
+- Complete command output when an assistant reads it through a pipe
+- Tracked-files-only packaging, private-skill linking, and a maintainer
+  privacy scan
+- Node.js 20 or later for everything a user runs
+
 ## Release boundary
 
-The official `v1.0.1` GitHub release is the current immutable distribution
-source. It repairs unauthenticated GitHub API retrieval discovered by the first
-public keeper; the `v1.0.0` tag and release remain unchanged as history.
+The official `v1.1.0` GitHub release is the current immutable distribution
+source. The `v1.0.0` and `v1.0.1` tags and releases remain unchanged as
+history.
 Skills and local workflows never grant account access or permission for an
 external action. Connections, sends, publishing, spending, deployment, and
 future updates still require their own explicit review and approval.

@@ -52,7 +52,9 @@ Ask which candidate the user wants to improve first.
 
 When they choose:
 
-1. add or update one `candidate` entry in `skills/INDEX.md`;
+1. add or update one line under Candidates in `skills/INDEX.md` (it can stay
+   unlinked until the skill file exists; then link it as described in Index
+   entries in `system/WORKSPACE-CONTRACT.md`);
 2. record only confirmed trigger, outcome, and approval boundaries;
 3. route to `system/workflows/build-a-skill.md`;
 4. begin with a recent real example.

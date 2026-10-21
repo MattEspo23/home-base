@@ -23,7 +23,9 @@ Use a recent real example. Keep unknowns explicit.
 ## Create the system record
 
 Create `systems/<system-name>/` from every file in `templates/system/`.
-Complete `BLUEPRINT.md` first and update `systems/INDEX.md`.
+Complete `BLUEPRINT.md` first, then add one linked line under Designing in
+`systems/INDEX.md`: `- [System name](<system-name>/BLUEPRINT.md) — one line`
+(see Index entries in `system/WORKSPACE-CONTRACT.md`).
 
 The smallest useful version must have:
 

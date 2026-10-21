@@ -1,0 +1,99 @@
+#!/bin/sh
+# Home Base maintainer pre-push privacy scan (home-base-pre-push v2).
+#
+# Install once per clone with:   node system/privacy-scan.mjs --install-hook
+# That copies this file into the clone's .git/hooks, outside the tracked tree,
+# so it runs for every branch, including branches cut from a commit that does
+# not contain it. Never point core.hooksPath into the repository.
+#
+# Then export HOME_BASE_PRIVATE_DENYLIST with the path of your private denylist
+# (one term per line, kept outside the repository).
+#
+# For each pushed ref the hook runs the scanner committed on that ref. It
+# refuses the push (exit 1) when the denylist is unset or empty, node is
+# missing, the pushed ref has no scanner, or the scan finds anything, fails,
+# or crashes. It scans the pushed commits (names, emails, messages, added
+# files and their paths), annotated tag objects, and the ref names, excluding
+# only history already on the remote being pushed to. Output is rule ids and
+# locations only.
+
+refuse() {
+  echo "pre-push: $1. Push refused. See system/PROMOTION.md." >&2
+  exit 1
+}
+
+[ -n "${HOME_BASE_PRIVATE_DENYLIST:-}" ] || refuse "HOME_BASE_PRIVATE_DENYLIST is not set, so the private privacy scan cannot run"
+[ -f "$HOME_BASE_PRIVATE_DENYLIST" ] && [ -s "$HOME_BASE_PRIVATE_DENYLIST" ] || refuse "the private denylist file is missing or empty"
+command -v node >/dev/null 2>&1 || refuse "node is not installed, so the privacy scan cannot run"
+root=$(git rev-parse --show-toplevel 2>/dev/null) || refuse "this is not a Git work tree"
+
+# Exclude only history already on the remote being pushed to ($1). A push to a
+# bare URL, or to a remote with an unusual name, scans everything it sends.
+remote_name=${1:-}
+known_remote=""
+case "$remote_name" in
+  "" | *[!A-Za-z0-9._-]*) ;;
+  *)
+    for candidate in $(git remote); do
+      [ "$candidate" = "$remote_name" ] && known_remote=$remote_name
+    done
+    ;;
+esac
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/home-base-pre-push.XXXXXX") || refuse "could not create a temporary folder"
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+
+zero_pattern='*[!0]*'
+status=0
+count=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "$local_ref" ] || continue
+  case "$local_sha" in
+    $zero_pattern) ;;
+    *) continue ;; # deleting a remote ref sends no content
+  esac
+  commit=$(git rev-parse --verify --quiet "$local_sha^{commit}") || refuse "a pushed ref does not name a commit"
+  count=$((count + 1))
+  scan="$work/$count"
+  mkdir -p "$scan/system/lib" || refuse "could not prepare the scanner"
+  for file in system/privacy-scan.mjs system/lib/tracked-files.mjs system/privacy-allowlist.json; do
+    git cat-file -e "$commit:$file" 2>/dev/null || refuse "the ref being pushed has no $file, so it cannot be scanned (cut promotion branches from a commit that has the scanner)"
+    git cat-file blob "$commit:$file" > "$scan/$file" || refuse "could not read $file from the ref being pushed"
+  done
+
+  range="$commit"
+  case "$remote_sha" in
+    $zero_pattern)
+      if git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+        range="$remote_sha..$commit"
+      elif [ -n "$known_remote" ]; then
+        range="$commit --not --remotes=$known_remote"
+      fi
+      ;;
+    *)
+      [ -n "$known_remote" ] && range="$commit --not --remotes=$known_remote"
+      ;;
+  esac
+
+  set -- --repo "$root" --commits "$range" --ref "$local_ref" --ref "$remote_ref" \
+    --allowlist "$scan/system/privacy-allowlist.json" --denylist "$HOME_BASE_PRIVATE_DENYLIST"
+  if [ "$(git cat-file -t "$local_sha")" = "tag" ]; then
+    set -- "$@" --tag "$local_sha"
+  fi
+  # Success needs exit 0 and the scanner's own "clean" summary, so a scanner
+  # that exits 0 without scanning can never pass a push.
+  output=$(node "$scan/system/privacy-scan.mjs" "$@" 2>&1)
+  code=$?
+  printf '%s\n' "$output"
+  case "$output" in
+    *"Privacy scan clean: "*) clean=yes ;;
+    *) clean=no ;;
+  esac
+  if [ "$code" -ne 0 ] || [ "$clean" != yes ]; then
+    status=1
+    [ "$code" -eq 1 ] || echo "pre-push: the privacy scan could not run (exit $code)." >&2
+  fi
+done
+
+[ "$status" -eq 0 ] || refuse "the privacy scan did not pass"
+exit 0

@@ -24,7 +24,8 @@ Say, in a natural voice:
 > Don’t paste passwords, keys, recovery codes, tokens, or payment details here;
 > you sign in directly on the provider’s page.
 
-Then ask:
+Then ask the first question, `scope` (a fresh `you/SETUP.md` records
+`next_question: scope`):
 
 > Should we start with your personal life, your work or business, or look
 > across both?
@@ -83,7 +84,9 @@ Ask what should change before the summary becomes durable. After confirmation:
 
 1. update the relevant files under `you/`;
 2. update relevant files under `work/` for work or combined discovery;
-3. create or update one project when a real outcome exists;
+3. create or update one project when a real outcome exists, with one linked
+   line under Active in `projects/INDEX.md`:
+   `- [Project name](<project-file>.md) — next action`;
 4. set `stage: opportunity_map`;
 5. follow `system/workflows/discover-opportunities.md`.
 

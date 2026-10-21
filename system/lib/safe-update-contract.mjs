@@ -1,10 +1,17 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const STATE_SCHEMA = 2
 const PLAN_SCHEMA = 2
 const PRESERVED_RUNTIME_ROOT = '.home-base'
+// The user's private overlay. It is never packaged, planned, staged, copied
+// into checkpoints, bases, or journals, and never deleted by an update.
+const INSTANCE_ROOT = 'instance'
+const UNSCANNED_ROOTS = new Set([PRESERVED_RUNTIME_ROOT, '.git', INSTANCE_ROOT])
+// Folders no release may ever claim, rename, or delete.
+const RESERVED_ROOTS = [INSTANCE_ROOT, PRESERVED_RUNTIME_ROOT, '.git']
 
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex')
@@ -22,17 +29,39 @@ function digest(value) {
   return sha256(stable(value))
 }
 
+// Manifest and record paths are POSIX-relative, NFC-normalized, and may not
+// contain empty, `.` or `..` segments, backslashes, NUL bytes, or a drive or
+// root prefix. Nothing is silently rewritten, so `x/../instance` or `./you`
+// can never resolve onto a protected folder.
 function portable(relativePath) {
   if (typeof relativePath !== 'string') throw new Error('Update path must be a string')
-  const normalized = relativePath.split(path.sep).join('/').replace(/^\.\/+/, '').normalize('NFC')
-  if (!normalized || normalized === '..' || normalized.startsWith('../') || path.posix.isAbsolute(normalized) || normalized.includes('\\')) {
+  const normalized = relativePath.normalize('NFC')
+  if (!normalized || normalized.includes('\\') || normalized.includes('\0') || path.posix.isAbsolute(normalized) || /^[A-Za-z]:/.test(normalized)) {
+    throw new Error(`Unsafe update path: ${relativePath}`)
+  }
+  if (normalized.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')) {
     throw new Error(`Unsafe update path: ${relativePath}`)
   }
   return normalized
 }
 
+// Case-insensitive file systems (macOS, Windows) treat `Instance` and
+// `instance` as one folder, so every ownership comparison uses a folded key.
+function foldKey(relativePath) {
+  return relativePath.normalize('NFKC').toLocaleLowerCase('en-US')
+}
+
 function overlap(left, right) {
-  return left === right || left.startsWith(`${right}/`) || right.startsWith(`${left}/`)
+  const a = foldKey(left)
+  const b = foldKey(right)
+  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
+}
+
+// Release roots are single top-level names.
+function rootName(relativePath, label) {
+  const normalized = portable(relativePath)
+  if (normalized.includes('/')) throw new Error(`${label} paths must be single top-level names: ${relativePath}`)
+  return normalized
 }
 
 function assertNoRootOverlap(roots, label) {
@@ -49,6 +78,35 @@ function safeJoin(root, relativePath) {
   const relative = path.relative(path.resolve(root), absolute)
   if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`Update path escapes its root: ${relativePath}`)
   return absolute
+}
+
+// Every rename or delete of a top-level folder inside the Home Base folder goes
+// through this guard. It refuses the private instance zone, runtime state, Git
+// metadata, and every user-owned root, comparing folded names and the real
+// on-disk identity (device and inode), so a case variant, a Unicode variant,
+// or a symbolic link can never alias a protected folder.
+function protectedNames(...lists) {
+  return [...new Set([...RESERVED_ROOTS, ...lists.flat().filter((item) => typeof item === 'string')])]
+}
+
+function assertMutableTarget(root, relativePath, protectedList) {
+  const normalized = portable(relativePath)
+  const first = normalized.split('/')[0]
+  const folded = new Set(protectedList.map(foldKey))
+  if (folded.has(foldKey(first))) throw new Error(`Refusing to rename or delete a protected folder: ${first}`)
+  const target = safeJoin(root, normalized)
+  const firstAbsolute = path.join(root, first)
+  const stat = fs.lstatSync(firstAbsolute, { throwIfNoEntry: false })
+  if (stat) {
+    if (stat.isSymbolicLink()) throw new Error(`Refusing to rename or delete through a symbolic link: ${first}`)
+    const realName = path.basename(fs.realpathSync.native(firstAbsolute))
+    if (folded.has(foldKey(realName))) throw new Error(`Refusing to rename or delete a protected folder: ${realName}`)
+    for (const name of protectedList) {
+      const other = fs.statSync(path.join(root, name), { throwIfNoEntry: false })
+      if (other && other.dev === stat.dev && other.ino === stat.ino) throw new Error(`Refusing to rename or delete a protected folder: ${name}`)
+    }
+  }
+  return target
 }
 
 function writeJsonAtomic(filePath, value) {
@@ -113,7 +171,7 @@ function scanWholeTree(root) {
   const records = new Map()
   const folded = new Map()
   for (const entry of fs.readdirSync(root, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name === PRESERVED_RUNTIME_ROOT || entry.name === '.git') continue
+    if (UNSCANNED_ROOTS.has(entry.name.normalize('NFKC').toLocaleLowerCase('en-US'))) continue
     scanNode(root, entry.name, records, folded)
   }
   return records
@@ -140,13 +198,32 @@ function readManifest(root) {
   }
   for (const field of ['maintainedPaths', 'userOwnedPaths', 'starterFiles']) {
     if (!Array.isArray(manifest[field])) throw new Error(`Release manifest is missing ${field}`)
-    manifest[field] = manifest[field].map(portable)
   }
+  manifest.maintainedPaths = manifest.maintainedPaths.map((item) => rootName(item, 'Maintained'))
+  manifest.userOwnedPaths = manifest.userOwnedPaths.map((item) => rootName(item, 'User-owned'))
+  manifest.starterFiles = manifest.starterFiles.map(portable)
   assertNoRootOverlap(manifest.maintainedPaths, 'Maintained')
   assertNoRootOverlap(manifest.userOwnedPaths, 'User-owned')
+  // instancePaths is an additive schema-2 field: releases before 1.1 omit it.
+  if (manifest.instancePaths !== undefined && !Array.isArray(manifest.instancePaths)) throw new Error('Release manifest instancePaths must be a list')
+  manifest.instancePaths = (manifest.instancePaths ?? []).map(portable)
+  if (manifest.instancePaths.some((item) => item !== INSTANCE_ROOT)) throw new Error(`The only supported instance path is ${INSTANCE_ROOT}`)
+  const claimed = [...manifest.maintainedPaths, ...manifest.userOwnedPaths].filter((item) => overlap(item, INSTANCE_ROOT))
+  if (claimed.length > 0) throw new Error(`Release manifest may not claim the instance zone: ${claimed.join(', ')}`)
+  const reserved = [...manifest.maintainedPaths, ...manifest.userOwnedPaths].filter((item) => RESERVED_ROOTS.some((name) => overlap(item, name)))
+  if (reserved.length > 0) throw new Error(`Release manifest may not claim a reserved folder: ${reserved.join(', ')}`)
   const unsafe = manifest.maintainedPaths.filter((maintained) => manifest.userOwnedPaths.some((owned) => overlap(maintained, owned)))
   if (unsafe.length > 0) throw new Error(`Candidate maintained paths overlap protected user-owned paths: ${unsafe.join(', ')}`)
   return { manifest, manifestDigest: sha256(bytes) }
+}
+
+// A repository URL is recorded in state, plans, and receipts, and printed by
+// init, so it may never carry a user name, password, or token.
+function assertSafeRepository(value) {
+  if (typeof value !== 'string' || !value.trim() || /[\s\0]/.test(value)) throw new Error('Source repository must be a plain URL or name')
+  if (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*@/i.test(value)) {
+    throw new Error('Source repository URLs may not contain a user name, password, or token; pass the URL without them')
+  }
 }
 
 function releaseIdentity(root, override = {}) {
@@ -158,6 +235,7 @@ function releaseIdentity(root, override = {}) {
   const sourceRepository = override.sourceRepository ?? receipt.source?.repository
   if (!/^[0-9a-f]{40}$/i.test(sourceCommit ?? '')) throw new Error('Release identity requires an immutable 40-character source commit')
   if (!sourceRef || !sourceRepository) throw new Error('Release identity requires source repository and ref receipts')
+  assertSafeRepository(sourceRepository)
   return {
     releaseId: manifest.releaseId,
     version: manifest.version,
@@ -189,6 +267,12 @@ function readState(root) {
   return state
 }
 
+// The lock folder appears atomically with its owner record (written in a
+// temporary folder, then renamed into place). A lock without a readable owner
+// is treated as stale only once it is old enough that no acquirer can still be
+// writing it.
+const OWNERLESS_LOCK_GRACE_MS = 60_000
+
 function acquireLock(root) {
   const paths = statePaths(root)
   fs.mkdirSync(paths.stateRoot, { recursive: true })
@@ -203,11 +287,25 @@ function acquireLock(root) {
         if (error.message?.startsWith('Another Home Base')) throw error
         if (error.code !== 'ESRCH') throw new Error('Home Base update lock exists and its owner cannot be verified')
       }
+    } else {
+      const age = Date.now() - fs.statSync(paths.lockRoot).mtimeMs
+      if (age < OWNERLESS_LOCK_GRACE_MS) throw new Error('Another Home Base update process is acquiring the lock; try again shortly')
     }
     removeExact(paths.lockRoot, paths.stateRoot)
   }
-  fs.mkdirSync(paths.lockRoot)
-  writeJsonAtomic(path.join(paths.lockRoot, 'owner.json'), { pid: process.pid, nonce: crypto.randomUUID() })
+  const pending = path.join(paths.stateRoot, `update.lock.pending-${process.pid}-${crypto.randomUUID()}`)
+  fs.mkdirSync(pending)
+  try {
+    writeJsonAtomic(path.join(pending, 'owner.json'), { pid: process.pid, nonce: crypto.randomUUID() })
+    try {
+      fs.renameSync(pending, paths.lockRoot)
+    } catch (error) {
+      if (['EEXIST', 'ENOTEMPTY', 'EPERM'].includes(error.code)) throw new Error('Another Home Base update process took the lock first')
+      throw error
+    }
+  } finally {
+    if (fs.existsSync(pending)) removeExact(pending, paths.stateRoot)
+  }
   return () => removeExact(paths.lockRoot, paths.stateRoot)
 }
 
@@ -245,11 +343,13 @@ function makeSnapshot(root, identity, destination) {
   return snapshot
 }
 
-function loadSnapshot(root, state) {
+// maintainedPaths defaults to the live manifest's; the legacy repair passes
+// the checkpoint's, because the live system/ folder may be missing.
+function loadSnapshot(root, state, maintainedPaths = readManifest(root).manifest.maintainedPaths) {
   const paths = statePaths(root)
   const snapshotRoot = safeJoin(paths.stateRoot, state.baseSnapshot.path)
   const snapshot = JSON.parse(fs.readFileSync(path.join(snapshotRoot, 'snapshot.json'), 'utf8'))
-  const records = scanRoots(path.join(snapshotRoot, 'tree'), readManifest(root).manifest.maintainedPaths)
+  const records = scanRoots(path.join(snapshotRoot, 'tree'), maintainedPaths)
   if (recordsDigest(records) !== snapshot.digest || snapshot.digest !== state.baseSnapshot.digest) {
     throw new Error('The immutable Home Base base snapshot is missing, mutable, or corrupt')
   }
@@ -258,28 +358,40 @@ function loadSnapshot(root, state) {
 }
 
 export function initializeUpdateState(root, identityOverride = {}) {
-  const paths = statePaths(root)
-  if (fs.existsSync(paths.stateFile)) {
-    const current = readState(root)
-    loadSnapshot(root, current)
-    return current
+  if (identityOverride.sourceRepository !== undefined) assertSafeRepository(identityOverride.sourceRepository)
+  // init sweeps staging, so it takes the same lock as prepare and apply.
+  const release = acquireLock(root)
+  try {
+    const paths = statePaths(root)
+    if (fs.existsSync(paths.stateFile)) {
+      const current = readState(root)
+      loadSnapshot(root, current)
+      // Clean up staging left by an earlier updater (including 1.0.x, which kept
+      // a whole-tree copy). Never touch it while a transaction is in flight.
+      if (!current.activeTransactionId) sweepStaging(root)
+      return current
+    }
+    const identity = releaseIdentity(root, identityOverride)
+    scanWholeTree(root)
+    const installationId = crypto.randomUUID()
+    const baseName = `${identity.releaseId.replace(/[^a-z0-9.-]/gi, '-')}-${identity.manifestDigest.slice(0, 12)}`
+    const basePath = `bases/${baseName}`
+    const snapshot = makeSnapshot(root, identity, path.join(paths.stateRoot, basePath))
+    const state = {
+      schemaVersion: STATE_SCHEMA,
+      installationId,
+      currentRelease: identity,
+      baseSnapshot: { path: basePath, digest: snapshot.digest },
+      lastSuccessfulTransactionId: null,
+      rollbackStack: [],
+      activeTransactionId: null,
+    }
+    sweepStaging(root)
+    writeJsonAtomic(paths.stateFile, state)
+    return state
+  } finally {
+    release()
   }
-  const release = releaseIdentity(root, identityOverride)
-  scanWholeTree(root)
-  const installationId = crypto.randomUUID()
-  const baseName = `${release.releaseId.replace(/[^a-z0-9.-]/gi, '-')}-${release.manifestDigest.slice(0, 12)}`
-  const basePath = `bases/${baseName}`
-  const snapshot = makeSnapshot(root, release, path.join(paths.stateRoot, basePath))
-  const state = {
-    schemaVersion: STATE_SCHEMA,
-    installationId,
-    currentRelease: release,
-    baseSnapshot: { path: basePath, digest: snapshot.digest },
-    lastSuccessfulTransactionId: null,
-    activeTransactionId: null,
-  }
-  writeJsonAtomic(paths.stateFile, state)
-  return state
 }
 
 function recordForPlan(record) {
@@ -334,6 +446,7 @@ function buildPlan(root, candidateRoot, options = {}) {
       throw new Error(`Candidate maintained paths overlap protected user-owned paths: ${maintained}`)
     }
   }
+  if (fs.existsSync(path.join(candidateRoot, INSTANCE_ROOT))) throw new Error('Candidate releases may not contain an instance/ folder')
   scanWholeTree(candidateRoot)
   const base = loadSnapshot(root, state)
   const localRecords = scanRoots(root, currentManifest.manifest.maintainedPaths)
@@ -449,6 +562,7 @@ export function prepareUpdate(root, candidateRoot, options = {}) {
   try {
     const existing = readState(root)
     if (existing.activeTransactionId) throw new Error(`Home Base must recover or finish active transaction ${existing.activeTransactionId}`)
+    sweepStaging(root)
     const plan = buildPlan(root, candidateRoot, options)
     const txRoot = transactionRoot(root, plan.transactionId)
     fs.mkdirSync(txRoot, { recursive: true })
@@ -583,16 +697,56 @@ function materializeManaged(root, candidateRoot, plan, inputs, resolution, desti
   }
 }
 
-function copyWholeTree(source, destination) {
-  const records = scanWholeTree(source)
-  copyRecords(source, destination, records)
+// Staging holds only what validation of the result needs: the materialized
+// maintained roots plus a short-lived copy of the user-owned roots. instance/,
+// runtime state, and unmanaged paths are never copied, and staging is removed
+// after every apply outcome.
+function copyUserOwnedRoots(source, destination, userOwnedPaths) {
+  copyRecords(source, destination, scanRoots(source, userOwnedPaths))
 }
 
-function createCheckpoint(root, plan, restorePaths) {
+// Callers sweep only when no transaction is active (or, inside apply, once the
+// outcome is final), so nothing here is needed for recovery. journal-old
+// folders left by an older updater are removed too.
+function sweepStaging(root) {
+  const { stagingRoot, stateRoot, transactionsRoot } = statePaths(root)
+  const removed = []
+  if (fs.existsSync(stagingRoot)) {
+    for (const entry of fs.readdirSync(stagingRoot)) {
+      removeExact(path.join(stagingRoot, entry), stateRoot)
+      removed.push(entry)
+    }
+  }
+  if (fs.existsSync(transactionsRoot)) {
+    let active = null
+    try {
+      if (fs.existsSync(statePaths(root).stateFile)) active = readState(root).activeTransactionId
+    } catch {
+      return removed
+    }
+    for (const transactionId of fs.readdirSync(transactionsRoot)) {
+      if (transactionId !== active) removeJournalOld(root, transactionId)
+    }
+  }
+  return removed
+}
+
+// journal-old holds the replaced maintained roots during a swap. Recovery and
+// rollback use the verified checkpoint, so it is removed once the outcome is final.
+function removeJournalOld(root, transactionId) {
+  for (const leftover of ['journal-old', 'restore']) {
+    const target = path.join(transactionRoot(root, transactionId), leftover)
+    if (fs.existsSync(target)) removeExact(target, statePaths(root).stateRoot)
+  }
+}
+
+function createCheckpoint(root, plan, restorePaths, protectedList) {
   const txRoot = transactionRoot(root, plan.transactionId)
   const checkpointRoot = path.join(txRoot, 'checkpoint')
   const treeRoot = path.join(checkpointRoot, 'tree')
   const maintainedPaths = minimalConflictRoots(restorePaths)
+  // A checkpoint copies only maintained roots: never instance/ or user files.
+  for (const maintained of maintainedPaths) assertMutableTarget(root, maintained, protectedList)
   const records = scanRoots(root, maintainedPaths)
   copyRecords(root, treeRoot, records)
   const checkpoint = {
@@ -600,6 +754,7 @@ function createCheckpoint(root, plan, restorePaths) {
     transactionId: plan.transactionId,
     planDigest: plan.planDigest,
     maintainedPaths,
+    protectedPaths: protectedList,
     records: serializedRecords(records),
     digest: recordsDigest(records),
   }
@@ -609,6 +764,8 @@ function createCheckpoint(root, plan, restorePaths) {
 
 function verifyCheckpoint(checkpointRoot) {
   const checkpoint = JSON.parse(fs.readFileSync(path.join(checkpointRoot, 'checkpoint.json'), 'utf8'))
+  if (!Array.isArray(checkpoint.maintainedPaths)) throw new Error('Update checkpoint is missing or tampered')
+  checkpoint.maintainedPaths = checkpoint.maintainedPaths.map(portable)
   const records = scanRoots(path.join(checkpointRoot, 'tree'), checkpoint.maintainedPaths)
   if (recordsDigest(records) !== checkpoint.digest || stable(serializedRecords(records)) !== stable(checkpoint.records)) {
     throw new Error('Update checkpoint is missing or tampered')
@@ -616,26 +773,109 @@ function verifyCheckpoint(checkpointRoot) {
   return { checkpoint, records, treeRoot: path.join(checkpointRoot, 'tree') }
 }
 
-function restoreCheckpoint(root, checkpointRoot, additionalRemovalPaths = []) {
+// The `system` root goes first, so the updater and validator are back before
+// anything else is touched.
+function systemFirst(roots) {
+  return [...roots].sort((left, right) => Number(right === 'system') - Number(left === 'system') || left.localeCompare(right))
+}
+
+// Restores one maintained root at a time by copy-then-swap: the checkpoint copy
+// is built in a sibling folder first, so an I/O failure part-way leaves the live
+// root in place instead of missing.
+// Verifies the checkpoint and checks every target before anything moves.
+function preflightRestore(root, checkpointRoot, additionalRemovalPaths = [], protectedList = []) {
   const verified = verifyCheckpoint(checkpointRoot)
-  const removalPaths = minimalConflictRoots([
+  const guard = protectedNames(protectedList, verified.checkpoint.protectedPaths ?? [])
+  const restorePaths = systemFirst(minimalConflictRoots([
     ...verified.checkpoint.maintainedPaths,
     ...additionalRemovalPaths,
-  ])
-  for (const maintained of removalPaths) {
-    const target = safeJoin(root, maintained)
-    if (fs.existsSync(target)) removeExact(target, root)
+  ]))
+  for (const maintained of restorePaths) assertMutableTarget(root, maintained, guard)
+  return { verified, guard, restorePaths }
+}
+
+function restoreCheckpoint(root, checkpointRoot, additionalRemovalPaths = [], { protectedList = [], fault } = {}) {
+  const { verified, guard, restorePaths } = preflightRestore(root, checkpointRoot, additionalRemovalPaths, protectedList)
+  const workRoot = path.join(path.dirname(checkpointRoot), 'restore')
+  if (fs.existsSync(workRoot)) removeExact(workRoot, path.dirname(checkpointRoot))
+  for (const maintained of restorePaths) {
+    const target = assertMutableTarget(root, maintained, guard)
+    const records = new Map([...verified.records].filter(([file]) => file === maintained || file.startsWith(`${maintained}/`)))
+    fault?.(`restore_copy:${maintained}`)
+    copyRecords(verified.treeRoot, path.join(workRoot, 'new'), records)
+    const incoming = safeJoin(path.join(workRoot, 'new'), maintained)
+    const old = safeJoin(path.join(workRoot, 'old'), maintained)
+    if (fs.lstatSync(target, { throwIfNoEntry: false })) {
+      fs.mkdirSync(path.dirname(old), { recursive: true })
+      fs.renameSync(target, old)
+    }
+    if (records.size > 0) fs.renameSync(incoming, target)
+    fsyncDirectory(path.dirname(target))
+    if (fs.existsSync(old)) removeExact(old, workRoot)
   }
-  copyRecords(verified.treeRoot, root, verified.records)
+  removeExact(workRoot, path.dirname(checkpointRoot))
+  fault?.('restored')
+  confirmRestored(root, verified, restorePaths)
   return verified
 }
 
-function swapMaintainedRoots(root, stagedRoot, maintainedPaths, transactionRootPath, fault) {
+// Paths under `roots` whose live record differs from every accepted record set.
+function mismatchedPaths(root, roots, acceptedSets) {
+  const live = scanRoots(root, roots)
+  const files = new Set([...live.keys(), ...acceptedSets.flatMap((records) => [...records.keys()])])
+  return [...files]
+    .filter((file) => underAny(file, roots))
+    .filter((file) => !acceptedSets.some((records) => sameRecord(live.get(file), records.get(file))))
+    .sort()
+}
+
+// A restore is confirmed by cryptographic equality with the checkpoint's
+// recorded hashes, never by running the restored tree's own (possibly older)
+// proof: 1.0.x proofs refuse any personalized install. Every restored root
+// must match the checkpoint exactly, and roots it did not record must be gone.
+function confirmRestored(root, verified, restorePaths) {
+  const mismatched = mismatchedPaths(root, restorePaths, [verified.records])
+  if (mismatched.length > 0) {
+    throw new Error(`Restored maintained files do not match the checkpoint: ${mismatched.slice(0, 20).join(', ')}`)
+  }
+}
+
+// A copy of the updater that wrote this transaction, kept with it, so recovery
+// still runs if the live system/ folder is missing or broken.
+const CONTRACT_FILE = fileURLToPath(import.meta.url)
+const RECOVERY_TOOL_FILES = [
+  ['update.mjs', path.join(path.dirname(CONTRACT_FILE), '..', 'update.mjs')],
+  ['lib/safe-update-contract.mjs', CONTRACT_FILE],
+]
+
+function writeRecoveryTool(root, transactionId) {
+  const toolSystem = path.join(transactionRoot(root, transactionId), 'tool', 'system')
+  if (fs.existsSync(toolSystem)) removeExact(toolSystem, statePaths(root).stateRoot)
+  for (const [relative, source] of RECOVERY_TOOL_FILES) {
+    if (fs.existsSync(source)) copyFileDurable(source, path.join(toolSystem, relative))
+  }
+  return recoveryCommand(root, transactionId)
+}
+
+function recoveryCommand(root, transactionId) {
+  const tool = path.join(transactionRoot(root, transactionId), 'tool', 'system', 'update.mjs')
+  return `node "${tool}" recover --root "${path.resolve(root)}"`
+}
+
+// The copy kept with the transaction is the updater that wrote it. The
+// release now in system/ may be an older one put back by the restore (a 1.0.x
+// recover refuses any personalized install), so the copy comes first.
+function recoveryAdvice(root, transactionId) {
+  return `Before anything else, run the updater copy kept with this transaction: ${recoveryCommand(root, transactionId)}`
+}
+
+function swapMaintainedRoots(root, stagedRoot, maintainedPaths, transactionRootPath, fault, protectedList) {
   const journalRoot = path.join(transactionRootPath, 'journal-old')
   fs.mkdirSync(journalRoot, { recursive: true })
+  for (const maintained of maintainedPaths) assertMutableTarget(root, maintained, protectedList)
   const journal = []
   for (const maintained of maintainedPaths) {
-    const target = safeJoin(root, maintained)
+    const target = assertMutableTarget(root, maintained, protectedList)
     const incoming = safeJoin(stagedRoot, maintained)
     const old = safeJoin(journalRoot, maintained)
     fs.mkdirSync(path.dirname(old), { recursive: true })
@@ -643,6 +883,7 @@ function swapMaintainedRoots(root, stagedRoot, maintainedPaths, transactionRootP
     journal.push(step)
     writeJsonAtomic(path.join(transactionRootPath, 'journal.json'), { steps: journal })
     if (step.hadCurrent) fs.renameSync(target, old)
+    fault?.(`mid_swap:${maintained}`)
     if (step.hasIncoming) {
       fs.mkdirSync(path.dirname(target), { recursive: true })
       fs.renameSync(incoming, target)
@@ -661,13 +902,18 @@ function appendHistory(root, heading, fields) {
   fs.appendFileSync(historyPath, `\n## ${heading}\n\n${lines}\n`)
 }
 
+// options.validate checks the incoming tree (staged, then live after the swap).
+// options.validateRestored checks a tree restored from the checkpoint, and only
+// after the restore has been confirmed against the checkpoint's hashes.
 export function applyPreparedUpdate(root, candidateRoot, planPath, options = {}) {
   const release = acquireLock(root)
-  const plan = readPlan(planPath)
   const paths = statePaths(root)
-  const txRoot = transactionRoot(root, plan.transactionId)
+  let plan
   let checkpoint
+  let abrupt = false
   try {
+    plan = readPlan(planPath)
+    const txRoot = transactionRoot(root, plan.transactionId)
     if (options.approval !== plan.planDigest) throw new Error('Apply requires explicit approval of the exact reviewed plan digest')
     if (plan.deletes.length > 0 && options.deletionApproval !== plan.planDigest) throw new Error('Reviewed deletes require exact explicit deletion approval')
     const inputs = verifyInputs(root, candidateRoot, plan)
@@ -679,8 +925,13 @@ export function applyPreparedUpdate(root, candidateRoot, planPath, options = {})
     const stagedRoot = path.join(paths.stagingRoot, plan.transactionId)
     if (fs.existsSync(stagedRoot)) removeExact(stagedRoot, paths.stateRoot)
     fs.mkdirSync(stagedRoot, { recursive: true })
-    copyWholeTree(root, stagedRoot)
     const candidateManifest = readManifest(candidateRoot).manifest
+    const userOwned = [...new Set([
+      ...readManifest(root).manifest.userOwnedPaths,
+      ...candidateManifest.userOwnedPaths,
+    ])]
+    const protectedList = protectedNames(userOwned)
+    copyUserOwnedRoots(root, stagedRoot, userOwned)
     for (const maintained of candidateManifest.maintainedPaths) {
       const target = safeJoin(stagedRoot, maintained)
       if (fs.existsSync(target)) removeExact(target, stagedRoot)
@@ -698,29 +949,44 @@ export function applyPreparedUpdate(root, candidateRoot, planPath, options = {})
       ...currentManifest.maintainedPaths,
       ...candidateManifest.maintainedPaths,
     ])]
-    checkpoint = createCheckpoint(root, plan, rollbackPaths)
+    checkpoint = createCheckpoint(root, plan, rollbackPaths, protectedList)
     verifyCheckpoint(checkpoint.checkpointRoot)
     const checkpointDigest = checkpoint.checkpoint.digest
+    const toolCommand = writeRecoveryTool(root, plan.transactionId)
     writeJsonAtomic(paths.recoveryMarker, {
       schemaVersion: 1,
       transactionId: plan.transactionId,
       planDigest: plan.planDigest,
       checkpointDigest,
       phase: 'committing',
+      recoverCommand: toolCommand,
     })
     writeTransaction(root, plan, 'committing', { checkpointDigest })
     options.fault?.('committing')
 
     try {
-      swapMaintainedRoots(root, stagedRoot, candidateManifest.maintainedPaths, txRoot, options.fault)
+      swapMaintainedRoots(root, stagedRoot, candidateManifest.maintainedPaths, txRoot, options.fault, protectedList)
       options.validate?.(root)
     } catch (error) {
       if (error?.simulatedAbrupt === true) throw error
       writeTransaction(root, plan, 'rolling_back', { error: error.message })
-      restoreCheckpoint(root, checkpoint.checkpointRoot, candidateManifest.maintainedPaths)
-      options.validate?.(root)
+      try {
+        restoreCheckpoint(root, checkpoint.checkpointRoot, candidateManifest.maintainedPaths, { protectedList, fault: options.fault })
+        options.validateRestored?.(root)
+      } catch (restoreError) {
+        if (restoreError?.simulatedAbrupt === true) throw restoreError
+        // Leave one clear, recoverable state: the transaction stays active, the
+        // recovery marker stays in place, and `recover` restores the same
+        // verified checkpoint again.
+        writeTransaction(root, plan, 'recovery_required', { error: error.message, restoreError: restoreError.message, recoverCommand: toolCommand })
+        const wrapped = new Error(`Update failed and automatic restore did not finish: ${error.message}. Restore: ${restoreError.message}. ${recoveryAdvice(root, plan.transactionId)}`)
+        wrapped.recoveryRequired = true
+        wrapped.recoverCommand = toolCommand
+        throw wrapped
+      }
       updateState(root, (state) => ({ ...state, activeTransactionId: null }))
       writeTransaction(root, plan, 'recovered', { recovery: 'checkpoint_restored', error: error.message })
+      removeJournalOld(root, plan.transactionId)
       if (fs.existsSync(paths.recoveryMarker)) removeExact(paths.recoveryMarker, paths.stateRoot)
       throw new Error(`Update failed and the verified checkpoint was restored: ${error.message}`)
     }
@@ -737,9 +1003,15 @@ export function applyPreparedUpdate(root, candidateRoot, planPath, options = {})
       currentRelease: newRelease,
       baseSnapshot: { path: basePath, digest: nextSnapshot.digest },
       lastSuccessfulTransactionId: plan.transactionId,
+      // Rollback is a stack: the transaction committed before this one becomes
+      // the latest again after this one is rolled back.
+      // With no latest transaction the stack is empty by construction; this also
+      // drops entries an older updater left behind.
+      rollbackStack: state.lastSuccessfulTransactionId ? [...(state.rollbackStack ?? []), state.lastSuccessfulTransactionId] : [],
       activeTransactionId: null,
     }))
     writeTransaction(root, plan, 'committed', { checkpointDigest, nextBaseDigest: nextSnapshot.digest })
+    removeJournalOld(root, plan.transactionId)
     if (fs.existsSync(paths.recoveryMarker)) removeExact(paths.recoveryMarker, paths.stateRoot)
     appendHistory(root, `${newRelease.version} — update committed`, {
       Result: 'applied after exact plan approval and validation',
@@ -748,45 +1020,153 @@ export function applyPreparedUpdate(root, candidateRoot, planPath, options = {})
       Checkpoint: path.relative(root, checkpoint.checkpointRoot),
     })
     return { plan, checkpoint: checkpoint.checkpointRoot, state: readState(root) }
+  } catch (error) {
+    abrupt = error?.simulatedAbrupt === true
+    throw error
   } finally {
+    // A simulated abrupt termination models a killed process, which cannot
+    // clean up; the next init, prepare, recover, or rollback sweeps instead.
+    // Each cleanup step is guarded so it can never hide the original error or
+    // leave the lock behind.
+    if (!abrupt) {
+      try { sweepStaging(root) } catch { /* the next init, prepare, recover, or rollback sweeps again */ }
+    }
     release()
   }
+}
+
+// Protected names for recovery come from the checkpoint itself and, when it is
+// still readable, the live manifest.
+function liveManifestPaths(root) {
+  try {
+    const { manifest } = readManifest(root)
+    return { maintainedPaths: manifest.maintainedPaths, userOwnedPaths: manifest.userOwnedPaths }
+  } catch {
+    return { maintainedPaths: [], userOwnedPaths: [] }
+  }
+}
+
+// A 1.0.x updater (its checkpoints record no protectedPaths) that failed after
+// the swap restored its checkpoint, then ran the restored tree's own proof,
+// which refuses any personalized install. The transaction stayed active, and
+// its own recover repeats the same proof forever.
+//
+// The repair compares every maintained file with the checkpoint (restore
+// completed) and the base snapshot of the current release (nothing was
+// swapped). If all match, it restores nothing and only clears the
+// transaction. If the 1.0.x restore was itself cut off (it deletes every
+// maintained root first, then copies them back one by one, so files or whole
+// folders, even system/, can be missing), it puts the maintained roots back
+// from the verified checkpoint and confirms every hash first. A file that is
+// present but matches neither, outside a root that is missing files, may hold
+// the user's own edit: then it refuses, changing nothing. It never writes a
+// user-owned path or instance/.
+// An interrupted 1.0.x rollback (the transaction it rolls back is still the
+// latest committed one) takes the ordinary restore path instead.
+function legacyRestoreAwaitingConfirmation(checkpointRoot, receipt, state, plan) {
+  if (receipt.phase !== 'rolling_back' || state.lastSuccessfulTransactionId === plan.transactionId) return false
+  const checkpointPath = path.join(checkpointRoot, 'checkpoint.json')
+  if (!fs.existsSync(checkpointPath)) return false
+  return JSON.parse(fs.readFileSync(checkpointPath, 'utf8')).protectedPaths === undefined
+}
+
+const topLevel = (file) => file.split('/')[0]
+
+function confirmLegacyRestoreInPlace(root, state, plan, checkpointRoot) {
+  if (stable(state.currentRelease) !== stable(plan.currentRelease) || stable(state.baseSnapshot) !== stable(plan.baseSnapshot)) {
+    throw new Error('Recovery refused: the update state no longer names the release this transaction started from. Nothing was changed.')
+  }
+  let verified
+  let checkpointManifest
+  try {
+    verified = verifyCheckpoint(checkpointRoot)
+    checkpointManifest = readManifest(verified.treeRoot).manifest
+  } catch {
+    throw new Error('Recovery refused: the copy of your Home Base files saved before the update is missing or damaged, so it cannot be checked or put back. Nothing was changed.')
+  }
+  const live = liveManifestPaths(root)
+  // Without a readable live system/ folder, the saved release names the
+  // user-owned folders that must never be touched.
+  const userOwned = live.userOwnedPaths.length > 0 ? live.userOwnedPaths : checkpointManifest.userOwnedPaths
+  const guard = protectedNames(userOwned)
+  const base = loadSnapshot(root, state, verified.checkpoint.maintainedPaths)
+  const roots = minimalConflictRoots([...verified.checkpoint.maintainedPaths, ...live.maintainedPaths])
+  // Only maintained roots are compared: never instance/, runtime state, or a user-owned root.
+  for (const maintained of roots) assertMutableTarget(root, maintained, guard)
+  const mismatched = mismatchedPaths(root, roots, [verified.records, base.records])
+  if (mismatched.length === 0) return { restored: false }
+  const liveRecords = scanRoots(root, roots)
+  const missing = mismatched.filter((file) => !liveRecords.has(file) && (verified.records.has(file) || base.records.has(file)))
+  const incompleteRoots = new Set(missing.map(topLevel))
+  const changed = mismatched.filter((file) => liveRecords.has(file) && !incompleteRoots.has(topLevel(file)))
+  if (changed.length > 0 || missing.length === 0) {
+    const listed = changed.length > 0 ? changed : mismatched
+    throw new Error(`Recovery refused: these maintained files match neither the update checkpoint nor the installed ${plan.currentRelease.version} release, so they may hold changes made after the failed update: ${listed.slice(0, 20).join(', ')}. Nothing was changed. Move any edits you want to keep somewhere else, put the files back as they were, and run recover again. See "An update stuck under 1.0.x" in system/UPDATE-GUIDE.md.`)
+  }
+  // The 1.0.x restore stopped part-way. Put back only the maintained roots,
+  // from the verified checkpoint; restoreCheckpoint confirms every hash.
+  restoreCheckpoint(root, checkpointRoot, live.maintainedPaths, { protectedList: guard })
+  return { restored: true }
 }
 
 export function recoverUpdate(root, options = {}) {
   const release = acquireLock(root)
   try {
     const state = readState(root)
-    if (!state.activeTransactionId) return { recovered: false, reason: 'no_active_transaction' }
+    if (!state.activeTransactionId) {
+      sweepStaging(root)
+      return { recovered: false, reason: 'no_active_transaction' }
+    }
     const txRoot = transactionRoot(root, state.activeTransactionId)
     const plan = readPlan(path.join(txRoot, 'plan.json'))
     const receiptPath = path.join(txRoot, 'transaction.json')
     const receipt = fs.existsSync(receiptPath) ? JSON.parse(fs.readFileSync(receiptPath, 'utf8')) : { phase: 'prepared' }
+    const paths = statePaths(root)
     if (['prepared', 'approved', 'staged'].includes(receipt.phase)) {
+      sweepStaging(root)
+      removeJournalOld(root, plan.transactionId)
       updateState(root, (current) => ({ ...current, activeTransactionId: null }))
       writeTransaction(root, plan, 'recovered', { recovery: 'aborted_before_current_tree_mutation' })
       return { recovered: true, action: 'aborted_before_mutation' }
     }
     const checkpointRoot = path.join(txRoot, 'checkpoint')
-    const currentMaintainedPaths = readManifest(root).manifest.maintainedPaths
-    restoreCheckpoint(root, checkpointRoot, currentMaintainedPaths)
-    options.validate?.(root)
-    const paths = statePaths(root)
+    if (legacyRestoreAwaitingConfirmation(checkpointRoot, receipt, state, plan)) {
+      // Verify first; nothing below runs unless every maintained file matches
+      // (after putting back the roots a cut-off 1.0.x restore left missing).
+      const { restored } = confirmLegacyRestoreInPlace(root, state, plan, checkpointRoot)
+      updateState(root, (current) => ({ ...current, activeTransactionId: null }))
+      writeTransaction(root, plan, 'recovered', { recovery: restored ? 'legacy_restore_completed_from_checkpoint' : 'legacy_restore_verified_in_place' })
+      removeJournalOld(root, plan.transactionId)
+      if (fs.existsSync(paths.recoveryMarker)) removeExact(paths.recoveryMarker, paths.stateRoot)
+      // The 1.0.x staging copy holds copies of the user's own files.
+      sweepStaging(root)
+      return { recovered: true, action: restored ? 'legacy_checkpoint_restored' : 'legacy_restore_verified' }
+    }
+    sweepStaging(root)
+    // Work from the checkpoint's own path list; the live manifest may be the
+    // half-swapped candidate's, or missing entirely.
+    const live = liveManifestPaths(root)
+    restoreCheckpoint(root, checkpointRoot, live.maintainedPaths, { protectedList: protectedNames(live.userOwnedPaths), fault: options.fault })
+    options.validateRestored?.(root)
     loadSnapshot(root, {
       ...state,
       currentRelease: plan.currentRelease,
       baseSnapshot: plan.baseSnapshot,
     })
+    // An interrupted rollback of the latest committed transaction finishes like
+    // a rollback (pop the stack); an interrupted apply never pushed anything.
+    const finishesRollback = state.lastSuccessfulTransactionId === plan.transactionId
+    const stack = state.rollbackStack ?? []
     updateState(root, (current) => ({
       ...current,
       currentRelease: plan.currentRelease,
       baseSnapshot: plan.baseSnapshot,
-      lastSuccessfulTransactionId: current.lastSuccessfulTransactionId === plan.transactionId
-        ? null
-        : current.lastSuccessfulTransactionId,
+      lastSuccessfulTransactionId: finishesRollback ? (stack.at(-1) ?? null) : current.lastSuccessfulTransactionId,
+      rollbackStack: finishesRollback ? stack.slice(0, -1) : stack,
       activeTransactionId: null,
     }))
     writeTransaction(root, plan, 'recovered', { recovery: 'checkpoint_restored_after_interruption' })
+    removeJournalOld(root, plan.transactionId)
     if (fs.existsSync(paths.recoveryMarker)) removeExact(paths.recoveryMarker, paths.stateRoot)
     appendHistory(root, `Interrupted update recovered`, {
       Result: 'verified checkpoint restored; update not applied',
@@ -804,22 +1184,39 @@ export function rollbackCommittedUpdate(root, transactionId, approval, options =
     const state = readState(root)
     if (state.activeTransactionId) throw new Error(`Cannot rollback while transaction ${state.activeTransactionId} is active`)
     if (state.lastSuccessfulTransactionId !== transactionId || approval !== transactionId) throw new Error('Rollback requires the exact latest committed transaction id as approval')
+    sweepStaging(root)
     const txRoot = transactionRoot(root, transactionId)
     const plan = readPlan(path.join(txRoot, 'plan.json'))
+    if (stable(plan.candidateRelease) !== stable(state.currentRelease)) {
+      throw new Error('Rollback refused: that transaction did not install the current release')
+    }
     const checkpointRoot = path.join(txRoot, 'checkpoint')
     const paths = statePaths(root)
+    const { manifest: currentManifest } = readManifest(root)
+    // The running updater is the one that knows this checkpoint; keep a copy.
+    preflightRestore(root, checkpointRoot, currentManifest.maintainedPaths, protectedNames(currentManifest.userOwnedPaths))
+    const toolCommand = writeRecoveryTool(root, transactionId)
     updateState(root, (current) => ({ ...current, activeTransactionId: transactionId }))
     writeJsonAtomic(paths.recoveryMarker, {
       schemaVersion: 1,
       transactionId,
       planDigest: plan.planDigest,
       phase: 'rolling_back',
+      recoverCommand: toolCommand,
     })
     writeTransaction(root, plan, 'rolling_back', { recovery: 'explicit_latest_transaction_rollback' })
     options.fault?.('rollback_marker')
-    const currentMaintainedPaths = readManifest(root).manifest.maintainedPaths
-    restoreCheckpoint(root, checkpointRoot, currentMaintainedPaths)
-    options.validate?.(root)
+    try {
+      restoreCheckpoint(root, checkpointRoot, currentManifest.maintainedPaths, { protectedList: protectedNames(currentManifest.userOwnedPaths), fault: options.fault })
+      options.validateRestored?.(root)
+    } catch (error) {
+      if (error?.simulatedAbrupt === true) throw error
+      writeTransaction(root, plan, 'recovery_required', { error: error.message, recoverCommand: toolCommand })
+      const wrapped = new Error(`Rollback did not finish: ${error.message}. ${recoveryAdvice(root, transactionId)}`)
+      wrapped.recoveryRequired = true
+      wrapped.recoverCommand = toolCommand
+      throw wrapped
+    }
     options.fault?.('rollback_restored')
     loadSnapshot(root, {
       ...state,
@@ -830,7 +1227,8 @@ export function rollbackCommittedUpdate(root, transactionId, approval, options =
       ...current,
       currentRelease: plan.currentRelease,
       baseSnapshot: plan.baseSnapshot,
-      lastSuccessfulTransactionId: null,
+      lastSuccessfulTransactionId: (current.rollbackStack ?? []).at(-1) ?? null,
+      rollbackStack: (current.rollbackStack ?? []).slice(0, -1),
       activeTransactionId: null,
     }))
     writeTransaction(root, plan, 'rolled_back', { previousBaseDigest: plan.baseSnapshot.digest })
@@ -846,6 +1244,11 @@ export function rollbackCommittedUpdate(root, transactionId, approval, options =
 }
 
 export const updateInternals = {
+  INSTANCE_ROOT,
+  RESERVED_ROOTS,
+  foldKey,
+  recoveryCommand,
+  sweepStaging,
   digest,
   portable,
   readManifest,

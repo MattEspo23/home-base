@@ -23,8 +23,7 @@ function valueAfter(flag) {
   return index >= 0 ? args[index + 1] : undefined
 }
 
-function usage() {
-  console.log(`Home Base verified release retrieval
+const usageText = `Home Base verified release retrieval
 
 Inspect immutable public metadata without changing Home Base:
   node system/retrieve-release.mjs inspect --metadata <https-github-release-metadata-url>
@@ -36,7 +35,22 @@ Download, hash, preflight, and extract to a new directory outside Home Base:
   node system/retrieve-release.mjs download --metadata <https-github-release-metadata-url> --output </new/absolute/directory>
 
 The downloaded candidate is still only an update input. Use system/update.mjs
-preview and prepare before any reviewed apply.`)
+preview and prepare before any reviewed apply.
+`
+
+// Assistants capture command output through a pipe, which Node writes
+// asynchronously on macOS; process.exit right after a write can cut it off at
+// the pipe buffer. Output is awaited until the operating system has taken every
+// byte, and only then does the script exit (an idle HTTPS connection could
+// otherwise keep it alive for a few seconds).
+function writeStdout(text) {
+  return new Promise((resolve) => {
+    process.stdout.write(text, () => resolve())
+  })
+}
+
+function printJson(value) {
+  return writeStdout(`${JSON.stringify(value, null, 2)}\n`)
 }
 
 async function metadataFromUrl(url) {
@@ -46,7 +60,7 @@ async function metadataFromUrl(url) {
 }
 
 if (!command || ['help', '--help'].includes(command)) {
-  usage()
+  await writeStdout(usageText)
   process.exit(0)
 }
 
@@ -56,7 +70,7 @@ const channel = valueAfter('--channel')
 if (command === 'discover') {
   if (!channel) throw new Error('discover requires --channel stable|preview')
   const discovered = await discoverChannel(channel)
-  console.log(JSON.stringify({
+  await printJson({
     result: 'verified_discovery',
     pointerUrl: discovered.pointerUrl,
     metadataUrl: discovered.metadataUrl,
@@ -65,7 +79,7 @@ if (command === 'discover') {
     commit: discovered.metadata.commit,
     artifact: discovered.metadata.artifact,
     mutatesInstalledTree: false,
-  }, null, 2))
+  })
   process.exit(0)
 }
 
@@ -73,7 +87,7 @@ if (!metadataUrl && !channel) throw new Error(`${command} requires --metadata or
 const metadata = channel ? (await discoverChannel(channel)).metadata : await metadataFromUrl(metadataUrl)
 
 if (command === 'inspect') {
-  console.log(JSON.stringify({
+  await printJson({
     result: 'verified_metadata',
     channel: metadata.channel,
     version: metadata.version,
@@ -83,7 +97,7 @@ if (command === 'inspect') {
     skillVault: metadata.skillVault,
     signing: metadata.signing,
     mutatesInstalledTree: false,
-  }, null, 2))
+  })
   process.exit(0)
 }
 
@@ -110,7 +124,7 @@ if (command === 'download') {
       expectedSha256: metadata.artifact.sha256,
       destinationRoot: destination,
     })
-    console.log(JSON.stringify({
+    await printJson({
       result: 'verified_candidate',
       version: metadata.version,
       tag: metadata.tag,
@@ -120,7 +134,7 @@ if (command === 'download') {
       uncompressedBytes: extracted.uncompressedBytes,
       mutatesInstalledTree: false,
       next: `node system/update.mjs preview --candidate ${extracted.homeBaseRoot}`,
-    }, null, 2))
+    })
   } finally {
     if (fs.existsSync(temporaryArchive)) fs.rmSync(temporaryArchive)
   }

@@ -60,6 +60,16 @@ writes a recovery marker, commits maintained roots, creates a new immutable
 base, and records success only after durability. User-owned paths are never
 eligible.
 
-If interrupted, run `recover` before any new update. If the user later asks to
-undo the latest committed update, preview the consequence and use the exact
-transaction id for rollback approval.
+If interrupted, or if an error says `recovery_required`, run `recover` before
+any new update. If `system/update.mjs` is missing or will not start, run the
+exact `recoverCommand` from `.home-base/state/recovery.json` (a copy of the
+updater kept with the transaction).
+
+After the first update from a 1.0.x release commits, tell the user that the
+older updater left a full copy of the folder in `.home-base/state/staging/`,
+and with their go-ahead run `node system/update.mjs init` once to remove it. If the user later asks to undo the latest committed update,
+preview the consequence and use the exact transaction id for rollback approval.
+Rollback is a stack: after one rollback, the previous update becomes the latest
+and can be undone the same way. Updates never touch the private `instance/`
+folder; before rolling back to a release older than 1.1, follow “Rollback across
+the instance boundary” in `system/UPDATE-GUIDE.md`.

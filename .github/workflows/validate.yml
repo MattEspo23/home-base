@@ -14,16 +14,75 @@ concurrency:
 
 jobs:
   validate:
+    # Only in the public Home Base repository: a user who keeps their own
+    # Home Base on GitHub gets no maintainer CI runs on their files.
+    if: github.repository == 'MattEspo23/home-base'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the reviewed source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # The transition test packages 1.0.1 from its tag.
+          fetch-depth: 0
+
+      # Exactly the Node version recorded in system/dashboard/dist/build-info.json,
+      # so the dashboard check can rebuild and compare byte for byte.
+      - name: Use Node.js 22.18.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22.18.0
+
+      - name: The pinned Node matches the dashboard build record
+        run: node -e "const r=require('./system/dashboard/dist/build-info.json').node; if (r !== process.version) { console.error('CI Node ' + process.version + ' but dist was built with ' + r + '; update node-version'); process.exit(1) }"
+
+      - name: Check the committed dashboard build is fresh
+        run: node system/dashboard/build.mjs --check
+
+      - name: Validate the full distributable tree
+        run: node system/package.mjs --output /tmp/home-base-ci.tgz
+
+      - name: Privacy scan of the public tree
+        run: node system/privacy-scan.mjs
+
+      # PROMOTION.md tells maintainers to export this variable; the tests must
+      # not depend on whether it is set.
+      - name: Privacy scan tests with a maintainer denylist exported
+        run: |
+          printf 'Fictionalterm\n' > "$RUNNER_TEMP/denylist.txt"
+          HOME_BASE_PRIVATE_DENYLIST="$RUNNER_TEMP/denylist.txt" node system/test-privacy-scan.mjs
+
+      - name: Ordered 1.0.1 to 1.1 transition and rollback
+        run: node system/test-transition.mjs
+
+  # Users need only Node.js 20 or later. The scripts they (or their assistant)
+  # run are checked on Node 20 too; building the dashboard needs 22.13+ and
+  # stays in the job above.
+  user-facing-node-20:
+    # Only in the public Home Base repository: a user who keeps their own
+    # Home Base on GitHub gets no maintainer CI runs on their files.
+    if: github.repository == 'MattEspo23/home-base'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out the reviewed source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: Use Node.js 22
+      - name: Use Node.js 20
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 22
+          node-version: 20
 
-      - name: Validate the full distributable tree
-        run: node system/package.mjs --output /tmp/home-base-ci.tgz
+      - name: User-facing checks on Node 20
+        run: |
+          node system/validate.mjs --release
+          node system/prove.mjs
+          node system/test-capability-doctor.mjs
+          node system/test-safe-update.mjs
+          node system/test-release-retrieval.mjs
+          node system/test-tracked-files.mjs
+          node system/test-instance-skills.mjs
+          node system/test-privacy-scan.mjs
+          node system/inspect-runtime.mjs
+          node system/dashboard/build.mjs --check
+          node system/dashboard/test-dashboard.mjs

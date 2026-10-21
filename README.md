@@ -10,7 +10,8 @@ You do not need to understand the folders before you begin.
 1. Download the Home Base archive, verify the adjacent SHA-256 receipt, and
    extract the `home-base` folder somewhere you can find again.
 2. Follow [SETUP-GUIDE.md](SETUP-GUIDE.md) to install Codex or Claude Code and
-   open this entire folder.
+   open this entire folder. Home Base's local checks and updates need
+   Node.js 20 or later; nothing else is installed.
 3. Copy this one instruction into a new task:
 
 > Open this entire Home Base folder, read `AGENTS.md`, initialize the safe update base if needed, and start my setup.
@@ -84,15 +85,17 @@ If you are not sure what an SOP or skill should be, read [SOP-STARTER.md](SOP-ST
 
 ## Works with more than one agent
 
-Home Base 1.0 is set up and statically checked
-for:
+Supported assistants:
 
 - Codex, through `AGENTS.md` and `.agents/skills/`
 - Claude Code, through `CLAUDE.md` and `.claude/skills/`
 
-The durable information is ordinary Markdown, so it is not trapped inside
-either model. Other tools may be able to read the same folder, but their
-automatic setup is not part of the current verified support contract.
+Grok Build CLI was also verified to read Home Base on 2026-10-15, in a
+read-only test. It reads the same `AGENTS.md`, `CLAUDE.md`, and Skill folders,
+so it needs no adapter of its own. Other assistants are unverified: they may be
+able to read the folder, but that is not part of the support contract. The
+durable information is ordinary Markdown, so it is not trapped inside any one
+model.
 
 ## Keep private things private
 
@@ -116,7 +119,7 @@ preview/prepare/approve/apply/recover/rollback process is documented in
 [system/UPDATE-GUIDE.md](system/UPDATE-GUIDE.md). Replacing the whole folder is
 not a safe update method.
 
-The official `v1.0.1` GitHub release provides the current immutable Home Base archive,
+The official `v1.1.0` GitHub release provides the current immutable Home Base archive,
 adjacent SHA-256 receipt, and machine-readable release metadata. Use those
 release assets rather than downloading a mutable branch snapshot.
 

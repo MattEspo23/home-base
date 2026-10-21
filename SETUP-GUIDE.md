@@ -36,6 +36,13 @@ sign in through Anthropic’s own flow, open this entire folder, and type:
 
 > Start
 
+## Other assistants
+
+Codex and Claude Code are the supported assistants. Grok Build CLI was also
+verified to read Home Base on 2026-10-15, in a read-only test; it uses the same
+files, so there is nothing extra to install in this folder. Other assistants
+are unverified.
+
 ## What you do not need
 
 You do not need to type Node.js commands for normal use. Codex or Claude can run
@@ -43,6 +50,17 @@ the included local validation, Capability Doctor, and update commands on your
 behalf. If the doctor reports that the required local runtime is unavailable,
 it should explain the smallest safe setup step rather than pretending the
 feature works.
+
+Those commands need Node.js 20 or later on your computer. Nothing else is
+installed into this folder, and there are no extra packages to download.
+(Maintainers who rebuild the dashboard need Node.js 22.13 or later; using
+Home Base never does.)
+
+To check, open Terminal (Command Prompt on Windows), type `node --version`, and
+press Return. `v20` or a higher number is enough. If it says the command was
+not found, or shows a lower number, install the LTS version from the official
+site, [nodejs.org](https://nodejs.org/), then open a new Terminal window and
+check again. Your assistant can also run this check for you.
 
 Never paste a password, API key, recovery code, payment detail, or login token
 into Home Base. When an account is eventually useful, sign in directly on the

@@ -3,6 +3,11 @@
 .env.*
 *.key
 *.pem
+*.p12
 CLAUDE.local.md
+.claude/settings.local.json
 .home-base/
 *.tgz
+instance/
+# Case variants of the private overlay, for case-sensitive Git (Linux).
+[Ii][Nn][Ss][Tt][Aa][Nn][Cc][Ee]/
