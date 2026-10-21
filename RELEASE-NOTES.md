@@ -57,10 +57,10 @@ never changed by an update.
   listed before upload, and links or anything that looks like a password,
   key, email address, phone or card number, or a folder path from your
   computer are refused. Say “update my online dashboard” after changes (it
-  asks you first each time), or ask for automatic updates at the end of each
-  session where Home Base changed. An automatic update checks the lock before
-  and after, and stops to ask when something new would go online. Say “take
-  it down” to delete it. See
+  asks you first each time), or ask Home Base to update it automatically at
+  the end of any session where Home Base changed. An automatic update checks
+  the lock before and after, and stops to ask when a new file or module would
+  go online. Say “take it down” to delete it. See
   [Put the dashboard online](./system/workflows/put-the-dashboard-online.md).
 - **Two new skills**, `style-home-base-dashboard` and
   `publish-home-base-dashboard`, so the release now has 42 repository Skills

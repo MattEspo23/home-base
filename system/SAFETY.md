@@ -38,8 +38,8 @@ Vercel team or account), you may re-publish the dashboard’s own copy to that
 same, already-locked project at the end of a session without asking again.
 Only through `node system/dashboard/publish.mjs --out <folder> --auto`, only
 after `--check-locked` passes first, and with the lock checked again
-afterwards; if a check fails or `--auto` refuses, upload nothing (or put the
-placeholder back) and ask. It never covers a first upload, a new file or
+afterwards. If `--auto` refuses, upload nothing and ask; if a lock check
+fails, the only upload is the placeholder going back, and then ask. It never covers a first upload, a new file or
 module, another project, team, or account, or a change to the lock. The user
 can withdraw it at any time.
 
@@ -61,6 +61,8 @@ Require explicit confirmation before:
 - sharing private information with another person or service.
 
 Earlier general enthusiasm does not replace confirmation at the consequential step.
+The one standing approval is the recorded online-dashboard exception in
+“Putting Home Base online” above.
 
 ## Build Mode preview
 

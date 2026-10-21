@@ -36,6 +36,10 @@ export const VERCEL_IGNORE = '.vercelignore'
 // never lists it).
 export const LOCK_RECORD = 'LOCK-CHECK.json'
 export const LOCK_RECORD_MAX_AGE_MS = 30 * 60 * 1000
+// The file list of the copy that last went online, written by --mark-uploaded
+// after the upload and a passing lock check. Automatic updates compare
+// against it. Stays on this computer; putting the placeholder back clears it.
+export const UPLOADED_RECORD = 'ONLINE-UPLOADED.json'
 // Made by the Vercel CLI when it links a folder to a project. Kept, never
 // uploaded (the .vercelignore allowlist leaves them out), and never read here.
 const CLI_ENTRIES = new Set(['.vercel', '.gitignore'])
@@ -341,7 +345,7 @@ export function prepareOutput(outDir, realRoot, { requireManifest = false } = {}
     throw new PublishRefused(['this folder has not been set up yet: build the placeholder here first and check the lock (see system/workflows/put-the-dashboard-online.md)'])
   }
   if (given) {
-    const known = new Set([...(previous?.files ?? []).map((item) => item?.path), ...(previous ? [MANIFEST, VERCEL_IGNORE, LOCK_RECORD] : [])].filter((item) => typeof item === 'string'))
+    const known = new Set([...(previous?.files ?? []).map((item) => item?.path), ...(previous ? [MANIFEST, VERCEL_IGNORE, LOCK_RECORD, UPLOADED_RECORD] : [])].filter((item) => typeof item === 'string'))
     const unknown = unknownEntries(realOut, known)
     if (unknown.length) {
       const shown = unknown.slice(0, 5).join(', ')
@@ -359,7 +363,8 @@ function removePrevious(realOut, previous) {
     const target = path.join(realOut, ...name.split('/'))
     if (lstat(target)?.isFile()) fs.rmSync(target)
   }
-  // Empty folders left behind, deepest first; never the CLI's own.
+  // Empty folders left behind, deepest first (each is listed after the
+  // folders inside it); never the CLI’s own.
   const folders = []
   const walk = (relative) => {
     for (const entry of fs.readdirSync(path.join(realOut, ...relative.split('/').filter(Boolean)), { withFileTypes: true })) {
@@ -368,7 +373,7 @@ function removePrevious(realOut, previous) {
     }
   }
   walk('')
-  for (const folder of folders.reverse()) {
+  for (const folder of folders) {
     const target = path.join(realOut, ...folder.split('/'))
     if (fs.readdirSync(target).length === 0) fs.rmdirSync(target)
   }
@@ -381,6 +386,8 @@ function removePrevious(realOut, previous) {
 export function writeOutput(realOut, previous, files, { kind, createdAt }) {
   fs.mkdirSync(realOut, { recursive: true, mode: 0o700 })
   removePrevious(realOut, previous)
+  // The placeholder going back means no copy of the user's is online now.
+  if (kind === 'placeholder' && lstat(path.join(realOut, UPLOADED_RECORD))?.isFile()) fs.rmSync(path.join(realOut, UPLOADED_RECORD))
   const listed = [...files.keys()].sort()
   for (const name of listed) {
     const target = path.join(realOut, ...name.split('/'))
@@ -400,7 +407,7 @@ export function writeOutput(realOut, previous, files, { kind, createdAt }) {
     createdAt,
     vercelCli: VERCEL_CLI,
     files: listed.map((name) => ({ path: name, bytes: files.get(name).length, sha256: crypto.createHash('sha256').update(files.get(name)).digest('hex') })),
-    localOnly: [VERCEL_IGNORE, MANIFEST, LOCK_RECORD],
+    localOnly: [VERCEL_IGNORE, MANIFEST, LOCK_RECORD, UPLOADED_RECORD],
   }
   fs.writeFileSync(path.join(realOut, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`)
   return manifest
@@ -423,14 +430,7 @@ export function clearLockRecord(outDir, realRoot) {
   if (lstat(target)?.isFile()) fs.rmSync(target)
 }
 
-// The real copy is written only into a folder the placeholder was uploaded
-// from (the Vercel CLI linked it: .vercel/project.json) and only within 30
-// minutes after a lock check passed for that folder.
-export function requireLockCheck(realOut, now = new Date()) {
-  const reasons = []
-  if (!lstat(path.join(realOut, '.vercel'))?.isDirectory() || !lstat(path.join(realOut, '.vercel', 'project.json'))?.isFile()) {
-    reasons.push('the placeholder has not been uploaded from this folder yet; upload it and turn on the lock first (see system/workflows/put-the-dashboard-online.md)')
-  }
+function readLockRecord(realOut) {
   const recordPath = path.join(realOut, LOCK_RECORD)
   let checkedAt = Number.NaN
   let addresses = []
@@ -441,15 +441,31 @@ export function requireLockCheck(realOut, now = new Date()) {
       addresses = Array.isArray(record.addresses) ? record.addresses : []
     } catch { checkedAt = Number.NaN }
   }
-  // When the Vercel CLI noted the project's name, every checked address must
-  // be one of that project's own (its addresses start with the name).
+  return { checkedAt, addresses }
+}
+
+// When the Vercel CLI noted the project's name, every checked address must be
+// one of that project's own (its addresses start with the name).
+function foreignAddressProblem(realOut, checkedAt, addresses) {
   let projectName = null
   try { projectName = JSON.parse(fs.readFileSync(path.join(realOut, '.vercel', 'project.json'), 'utf8')).projectName } catch { projectName = null }
-  if (typeof projectName === 'string' && projectName && Number.isFinite(checkedAt)) {
-    const prefix = projectName.toLowerCase()
-    const foreign = addresses.filter((address) => { try { return !new URL(address).hostname.toLowerCase().startsWith(prefix) } catch { return true } })
-    if (addresses.length === 0 || foreign.length) reasons.push(`the lock was checked on an address that is not this project’s (${projectName}); check the addresses the upload printed`)
+  if (typeof projectName !== 'string' || !projectName || !Number.isFinite(checkedAt)) return null
+  const prefix = projectName.toLowerCase()
+  const foreign = addresses.filter((address) => { try { return !new URL(address).hostname.toLowerCase().startsWith(prefix) } catch { return true } })
+  return addresses.length === 0 || foreign.length ? `the lock was checked on an address that is not this project’s (${projectName}); check the addresses the upload printed` : null
+}
+
+// The real copy is written only into a folder the placeholder was uploaded
+// from (the Vercel CLI linked it: .vercel/project.json) and only within 30
+// minutes after a lock check passed for that folder.
+export function requireLockCheck(realOut, now = new Date()) {
+  const reasons = []
+  if (!lstat(path.join(realOut, '.vercel'))?.isDirectory() || !lstat(path.join(realOut, '.vercel', 'project.json'))?.isFile()) {
+    reasons.push('the placeholder has not been uploaded from this folder yet; upload it and turn on the lock first (see system/workflows/put-the-dashboard-online.md)')
   }
+  const { checkedAt, addresses } = readLockRecord(realOut)
+  const foreign = foreignAddressProblem(realOut, checkedAt, addresses)
+  if (foreign) reasons.push(foreign)
   const age = now.getTime() - checkedAt
   if (!Number.isFinite(checkedAt) || age < -60_000 || age > LOCK_RECORD_MAX_AGE_MS) {
     reasons.push('check the lock first: node system/dashboard/publish.mjs --check-locked <production address> <deployment address> --out <this folder> must pass within the 30 minutes before the real copy is built')
@@ -459,19 +475,46 @@ export function requireLockCheck(realOut, now = new Date()) {
 
 // ------------------------------------------------------- automatic update
 
+// After the user's copy went online and the lock check after the upload
+// passed: notes which files are online now. The lock check must have passed
+// after this copy was built, and within the last 30 minutes.
+export function markUploaded(realOut, now = new Date()) {
+  const manifest = readManifest(realOut)
+  if (manifest?.kind !== 'snapshot' || !Array.isArray(manifest.files)) {
+    throw new PublishRefused(['this folder holds the placeholder, not a copy of your dashboard; there is nothing to mark as online'])
+  }
+  const built = Date.parse(manifest.createdAt)
+  const { checkedAt, addresses } = readLockRecord(realOut)
+  const reasons = []
+  const foreign = foreignAddressProblem(realOut, checkedAt, addresses)
+  if (foreign) reasons.push(foreign)
+  if (!Number.isFinite(built) || !Number.isFinite(checkedAt) || checkedAt < built || now.getTime() - checkedAt > LOCK_RECORD_MAX_AGE_MS || checkedAt - now.getTime() > 60_000) {
+    reasons.push('check the lock after the upload first: --check-locked <production address> <new deployment address> --out <this folder> must pass after this copy was built')
+  }
+  if (reasons.length) throw new PublishRefused(reasons)
+  const files = manifest.files.map((item) => item?.path).filter((item) => typeof item === 'string').sort()
+  fs.writeFileSync(path.join(realOut, UPLOADED_RECORD), `${JSON.stringify({ schemaVersion: 1, markedAt: now.toISOString(), copyBuiltAt: manifest.createdAt, files }, null, 2)}\n`)
+  return files
+}
+
 // An automatic update (a standing yes the user recorded) only re-publishes the
 // same kind of copy the user already saw go online: never a first upload, and
-// never a file path the previous copy did not have (a new module, a new file).
-// Anything else stops so the assistant can show the list and ask.
-export function requireSameFiles(previous, files) {
-  if (previous?.kind !== 'snapshot' || !Array.isArray(previous.files)) {
-    throw new PublishRefused(['an automatic update never makes the first upload of your dashboard; show the file list and ask the user'])
+// never a file path the copy marked as online did not have (a new module, a
+// new file). Anything else stops so the assistant can show the list and ask.
+export function requireSameFiles(realOut, previous, files) {
+  const recordPath = path.join(realOut, UPLOADED_RECORD)
+  let uploaded = null
+  if (lstat(recordPath)?.isFile()) {
+    try { uploaded = JSON.parse(fs.readFileSync(recordPath, 'utf8')).files } catch { uploaded = null }
   }
-  const before = new Set(previous.files.map((item) => item?.path).filter((item) => typeof item === 'string'))
+  if (previous?.kind !== 'snapshot' || !Array.isArray(uploaded)) {
+    throw new PublishRefused(['this folder has no copy of your dashboard marked as online (only the placeholder, or a copy that never went online), so an automatic update stops here: show the file list and ask the user'])
+  }
+  const before = new Set(uploaded.filter((item) => typeof item === 'string'))
   const added = [...files.keys()].filter((name) => !before.has(name)).sort()
   if (added.length) {
     const shown = added.slice(0, 10).join(', ')
-    throw new PublishRefused([`this copy has files the last upload did not have (${shown}${added.length > 10 ? `, and ${added.length - 10} more` : ''}); an automatic update stops here: show the file list and ask the user`])
+    throw new PublishRefused([`this copy has files the copy online does not have (${shown}${added.length > 10 ? `, and ${added.length - 10} more` : ''}); an automatic update stops here: show the file list and ask the user`])
   }
 }
 

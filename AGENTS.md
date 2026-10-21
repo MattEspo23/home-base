@@ -140,6 +140,7 @@ plugins, configured connectors, authenticated accounts, or permission to act.
   `you/PREFERENCES.md`, re-publish the dashboard’s own copy to that same
   locked project without asking again, only with `publish.mjs --out <folder>
   --auto` between two passing lock checks (see
-  `system/workflows/put-the-dashboard-online.md`). If anything refuses or
-  fails, upload nothing and ask.
+  `system/workflows/put-the-dashboard-online.md`). If `--auto` refuses,
+  upload nothing and ask; if a lock check fails, the only upload is the
+  placeholder going back, and then ask.
 - Do not rely on agent-native memory alone for information the user expects to carry between tools. Propose an appropriate Home Base file instead.

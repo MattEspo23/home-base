@@ -13,7 +13,7 @@ import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { freePort } from './lib/chrome.mjs'
 import {
-  LOCK_RECORD, MANIFEST, PROBE_PATHS, PublishRefused, VERCEL_CLI, VERCEL_IGNORE, buildPlaceholder, buildSnapshot, checkLocked,
+  LOCK_RECORD, MANIFEST, UPLOADED_RECORD, PROBE_PATHS, PublishRefused, VERCEL_CLI, VERCEL_IGNORE, buildPlaceholder, buildSnapshot, checkLocked,
   clearLockRecord, lockCheckOrigin, onlinePolicy, prepareOutput, recordLockCheck, requireLockCheck, scanFiles, staticPage, writeOutput,
 } from './lib/online.mjs'
 import { SECURITY_HEADERS } from './lib/server.mjs'
@@ -428,48 +428,89 @@ test('a lock check is recorded only in a folder this tool set up, expires, and n
   assert.ok(!fs.readFileSync(path.join(out, VERCEL_IGNORE), 'utf8').includes(LOCK_RECORD))
 })
 
-test('an automatic update needs a lock check, never makes the first upload, and never adds a file', () => {
+test('an automatic update needs a lock check, a copy marked as online, and no new file', () => {
   const root = fixture()
   const out = path.join(scratch, 'out-auto', 'home-base-dashboard')
   const run = (...args) => spawnSync(process.execPath, [publishScript, '--home-base', root, ...args], { encoding: 'utf8' })
+  const check = () => recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'], new Date(Date.now() + 1000))
   assert.equal(run('--placeholder', '--out', out).status, 0)
   write(out, '.vercel/project.json', '{ "projectId": "prj_fixture", "projectName": "home-base-dashboard" }\n')
-  // (c) Never the first upload: the folder still holds only the placeholder.
-  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'])
+  // (c) Never the first upload: the folder holds only the placeholder.
+  check()
   const first = run('--out', out, '--auto')
   assert.equal(first.status, 1)
-  assert.match(first.stderr, /never makes the first upload/)
+  assert.match(first.stderr, /no copy of your dashboard marked as online/)
   assert.ok(fs.existsSync(path.join(out, LOCK_RECORD)), 'a refusal leaves the folder, record included, as it was')
-  // The user's own first upload, after seeing the list.
+  assert.match(run('--mark-uploaded', '--out', out).stderr, /holds the placeholder/)
+  // A copy the user built but never put online does not count either.
+  const declined = run('--out', out)
+  assert.equal(declined.status, 0, declined.stderr)
+  check()
+  const notOnline = run('--out', out, '--auto')
+  assert.equal(notOnline.status, 1)
+  assert.match(notOnline.stderr, /no copy of your dashboard marked as online/)
+  // Marking needs a lock check that passed after the copy was built.
+  fs.rmSync(path.join(out, LOCK_RECORD))
+  const unmarked = run('--mark-uploaded', '--out', out)
+  assert.equal(unmarked.status, 1)
+  assert.match(unmarked.stderr, /check the lock after the upload first/)
+  // The user's own first upload: build, (upload), check again, mark.
+  check()
   assert.equal(run('--out', out).status, 0)
-  // (a) Every automatic run needs its own passing lock check.
+  check()
+  const marked = run('--mark-uploaded', '--out', out)
+  assert.equal(marked.status, 0, marked.stderr)
+  assert.match(marked.stdout, /Marked as online: \d+ files/)
+  const uploaded = JSON.parse(fs.readFileSync(path.join(out, UPLOADED_RECORD), 'utf8'))
+  assert.ok(uploaded.files.includes('status.json') && uploaded.files.includes('instance-modules/reading/index.js'))
+  // (a) Every automatic run needs a passing lock check recorded for the folder.
+  fs.rmSync(path.join(out, LOCK_RECORD))
   const unchecked = run('--out', out, '--auto')
   assert.equal(unchecked.status, 1)
   assert.match(unchecked.stderr, /check the lock first/)
   // Same files, new contents: allowed.
   write(root, 'projects/INDEX.md', '## Active\n\n- [Garden plan](garden.md) — fictional\n')
-  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'])
+  check()
   const same = run('--out', out, '--auto')
   assert.equal(same.status, 0, same.stderr)
-  assert.match(same.stdout, /Automatic update: the same files as the last upload/)
+  assert.match(same.stdout, /Automatic update: the same files as the copy online/)
   assert.match(fs.readFileSync(path.join(out, 'status.json'), 'utf8'), /Garden plan/)
-  // (b) A file the last upload did not have (a new module) stops and asks.
+  // (b) A file the copy online does not have (a new module) stops and asks,
+  // also after the user built it (and did not mark it as online).
   write(root, 'instance/dashboard/modules.json', JSON.stringify({ modules: [
     { id: 'reading', title: 'Reading list', entry: 'index.js' },
     { id: 'garden', title: 'Garden', entry: 'index.js' },
   ] }))
   write(root, 'instance/dashboard/modules/garden/index.js', 'export function mount(element) { element.textContent = "Garden" }\n')
-  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'])
+  check()
   const before = listFiles(out)
   const added = run('--out', out, '--auto')
   assert.equal(added.status, 1)
-  assert.match(added.stderr, /files the last upload did not have \(instance-modules\/garden\/index\.js\)/)
+  assert.match(added.stderr, /files the copy online does not have \(instance-modules\/garden\/index\.js\)/)
   assert.deepEqual(listFiles(out), before, 'nothing was written')
-  // The user can still publish it after seeing the list and saying yes.
+  check()
+  assert.equal(run('--out', out).status, 0, 'the user can build it to see the list')
+  check()
+  assert.equal(run('--out', out, '--auto').status, 1, 'a built but unmarked new module still stops an automatic update')
+  // A removed file is fine: the copy online simply loses it.
+  write(root, 'instance/dashboard/modules.json', JSON.stringify({ modules: [] }))
+  check()
+  const removed = run('--out', out, '--auto')
+  assert.equal(removed.status, 0, removed.stderr)
+  assert.ok(!fs.existsSync(path.join(out, 'instance-modules')), 'the emptied module folders are gone')
+  // Putting the placeholder back clears the mark: the next automatic run stops.
+  assert.equal(run('--placeholder', '--out', out).status, 0)
+  assert.ok(!fs.existsSync(path.join(out, UPLOADED_RECORD)))
+  check()
   assert.equal(run('--out', out).status, 0)
-  // --auto only goes with --out.
-  assert.equal(run('--placeholder', '--out', out, '--auto').status, 2)
-  assert.equal(run('--check-locked', 'https://home-base-dashboard.vercel.app', '--out', out, '--auto').status, 2)
+  check()
+  assert.match(run('--out', out, '--auto').stderr, /no copy of your dashboard marked as online/)
+  // The marks stay on this computer.
+  assert.ok(!fs.readFileSync(path.join(out, VERCEL_IGNORE), 'utf8').includes(UPLOADED_RECORD))
+  // --auto and --mark-uploaded only go with --out.
+  assert.match(run('--placeholder', '--out', out, '--auto').stderr, /--auto is used without --placeholder/)
+  assert.match(run('--check-locked', 'https://home-base-dashboard.vercel.app', '--out', out, '--auto').stderr, /used without --placeholder, --auto, or --mark-uploaded/)
+  assert.match(run('--mark-uploaded', '--out', out, '--auto').stderr, /--mark-uploaded is used on its own/)
 })
 
 test('the pinned Vercel CLI is an exact version', () => {
