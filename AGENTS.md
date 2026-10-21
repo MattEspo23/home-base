@@ -76,6 +76,8 @@ Home Base is the user’s durable AI workspace. Treat the user as a person tryin
   denied, ask the user to run the command in their own Terminal window.
 - “Redesign my Home Base in this style,” “style my dashboard,” “make it look
   like this,” or equivalent → `system/workflows/style-the-dashboard.md`
+- “Put my dashboard online,” “I want it on my phone,” “update my online
+  dashboard,” or equivalent → `system/workflows/put-the-dashboard-online.md`
 - “Does this need an app/dashboard/site?” or “deploy this” →
   `system/workflows/review-interface-and-deployment.md`
 - “Make this system better,” “what did we learn?”, or a system/project
@@ -90,7 +92,7 @@ User-created workflows are indexed in `skills/INDEX.md`; tool and connection
 records are indexed in `tools/INDEX.md`. When a request matches a skill, read
 its `SKILL.md` before doing the task.
 
-The release includes 41 repository Skills across both supported adapters. The
+The release includes 42 repository Skills across both supported adapters. The
 complete list is `system/distribution/SKILL-CATALOG.md`. A large Skill set may
 not fit in the host’s initial summary; explicit `$skill-name` invocation still
 uses the installed package. Do not confuse bundled Skills with installed
@@ -129,4 +131,8 @@ plugins, configured connectors, authenticated accounts, or permission to act.
   in a browser on this computer, including when they paste it back. Never
   write it into any file, memory, note, or index.
 - Never store secret values or highly sensitive records here.
+- Never upload Home Base content to any host unless the project is first
+  verified locked to the owner’s own login
+  (`node system/dashboard/publish.mjs --check-locked` passes), and never make
+  it public.
 - Do not rely on agent-native memory alone for information the user expects to carry between tools. Propose an appropriate Home Base file instead.

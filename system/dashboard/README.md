@@ -183,9 +183,12 @@ installed, saves pictures of a fictional sample Home Base.
 
 ## Ways to open your dashboard
 
-- **On this computer:** available today (see “Start it” above).
-- **From your phone:** coming, over a private network.
-- **Hosted:** advanced, coming.
+- **On this computer:** see “Start it” above. This is the default.
+- **Online, on your phone and computer:** optional. Say “put my dashboard
+  online.” Your assistant puts a copy of the dashboard’s own view (not your
+  folder) on your own free Vercel account, locked so only you can open it
+  after signing in with Vercel, and updates it when you ask. See
+  [Put the dashboard online](../workflows/put-the-dashboard-online.md).
 
 ## Private modules
 
@@ -221,7 +224,10 @@ Every visual value in `src/styles.css` comes from the tokens at its top.
 `lib/theme.mjs` holds the theme rules and the default colours, which a test
 keeps equal to those tokens; `themes/precise.json` must stay the default look.
 
-Tests: `node system/dashboard/test-dashboard.mjs`. Browser check:
+Tests: `node system/dashboard/test-dashboard.mjs` and
+`node system/dashboard/test-publish.mjs` (the online copy and the lock check,
+against local fixtures only). Browser check:
 `node system/dashboard/smoke-browser.mjs` drives a local Chrome or Chromium,
 if one is installed, through the sign-in and the page on a temporary
-fixture; without one it says so and skips.
+fixture, then renders that fixture's online copy from a local folder server;
+without one it says so and skips.

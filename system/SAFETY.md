@@ -23,6 +23,14 @@ on `127.0.0.1`. Hand the user that printed address once in chat. If they ask,
 you may open that exact address in a browser on this computer, including when
 they paste it back. Never write it into any file, memory, note, or index.
 
+## Putting Home Base online
+
+Never upload Home Base content to any host unless the project is first
+verified locked to the owner’s own login, and never make it public. The only
+supported way is `system/workflows/put-the-dashboard-online.md`: a harmless
+placeholder goes up first, and the real copy only after
+`node system/dashboard/publish.mjs --check-locked` passes.
+
 ## Ask at the moment of action
 
 Require explicit confirmation before:

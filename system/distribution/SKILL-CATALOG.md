@@ -1,6 +1,6 @@
 # Included Skills
 
-Home Base includes 41 editable repository Skills: 14 Home Base core workflows and 27 pinned Skill Vault packages. Codex may omit some names from its first context summary when the Skill list is large; that is a display-budget limit, not a missing package. Invoke any package explicitly as `$skill-name`.
+Home Base includes 42 editable repository Skills: 15 Home Base core workflows and 27 pinned Skill Vault packages. Codex may omit some names from its first context summary when the Skill list is large; that is a display-budget limit, not a missing package. Invoke any package explicitly as `$skill-name`.
 
 | Skill | Layer | What it does | Explicit invocation |
 |---|---|---|---|
@@ -26,6 +26,7 @@ Home Base includes 41 editable repository Skills: 14 Home Base core workflows an
 | `inspect-home-base-capabilities` | Home Base core | Inspect current runtime and provider capabilities when a Home Base system needs coding, browser control, computer control, a connector, database, scheduling, or hosting. | `$inspect-home-base-capabilities` |
 | `plan-home-base-tool` | Home Base core | Create a minimal-access connection plan when the user asks what tools Home Base could use or wants to connect an application safely. | `$plan-home-base-tool` |
 | `prototype` | Skill Vault | Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like. | `$prototype` |
+| `publish-home-base-dashboard` | Home Base core | Put the Home Base dashboard online on the user's own Vercel account, locked to their Vercel sign-in, so it opens on their phone and computer; also update it after changes or take it down. | `$publish-home-base-dashboard` |
 | `research` | Skill Vault | Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. | `$research` |
 | `resolving-merge-conflicts` | Skill Vault | Use when you need to resolve an in-progress git merge/rebase conflict. | `$resolving-merge-conflicts` |
 | `review-home-base-interface` | Home Base core | Decide whether a Home Base system needs conversation, a checklist, form, local dashboard, website, application, or approved hosted deployment. | `$review-home-base-interface` |

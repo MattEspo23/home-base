@@ -273,13 +273,13 @@ function pluginSummary(observation, plugin, pluginName) {
 
 const PROBES = {
   'home-base-core-skills': (observation, env) => {
-    const present = env.folder.agentsSkills.length === 41 && ['start-home-base', 'review-home-base-update'].every((name) => env.folder.agentsSkills.includes(name))
+    const present = env.folder.agentsSkills.length === 42 && ['start-home-base', 'review-home-base-update'].every((name) => env.folder.agentsSkills.includes(name))
     observation.workflow = present ? 'present' : 'absent'
     observation.summary = present ? 'core Skills present in .agents/skills' : 'core Skills missing from .agents/skills'
     observation.source.push('repository Skill metadata')
   },
   'skill-vault-skills': (observation, env) => {
-    const present = env.folder.agentsSkills.length === 41 && ['ask-espo', 'youtube-action-plan'].every((name) => env.folder.agentsSkills.includes(name))
+    const present = env.folder.agentsSkills.length === 42 && ['ask-espo', 'youtube-action-plan'].every((name) => env.folder.agentsSkills.includes(name))
     observation.workflow = present ? 'present' : 'absent'
     observation.summary = present ? 'pinned Skill Vault packages present' : 'pinned Skill Vault packages missing'
     observation.source.push('pinned Skill Vault projection')

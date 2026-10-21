@@ -29,8 +29,8 @@ import { readCustomCss, readTheme } from './theme.mjs'
 
 // Where the page's theme stylesheets go, after the base stylesheet.
 export const THEME_SLOT = '<!-- home-base-theme -->'
-const TOKENS_LINK = '<link rel="stylesheet" href="/instance-theme/tokens.css" />'
-const CUSTOM_LINK = '<link rel="stylesheet" href="/instance-theme/theme.css" />'
+export const TOKENS_LINK = '<link rel="stylesheet" href="/instance-theme/tokens.css" />'
+export const CUSTOM_LINK = '<link rel="stylesheet" href="/instance-theme/theme.css" />'
 
 const MIME = {
   '.js': 'text/javascript; charset=utf-8',

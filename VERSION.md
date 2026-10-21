@@ -21,7 +21,7 @@
 - Visible suggestion budgeting, durable decline, and two-run learning proof
 - Conversation-first SOP discovery, skill building, safe connection planning,
   update review, and learning closeout
-- A pinned 41-Skill bundle (14 Home Base core + 27 released Skill Vault 0.1.3 packages)
+- A pinned 42-Skill bundle (15 Home Base core + 27 released Skill Vault 0.1.3 packages)
   with matching Codex and Claude adapters, file hashes, and exact provenance
 - Root MIT licensing, byte-verbatim third-party notices, protected brand/identity
   boundaries, latest-stable best-effort support, and private security routing

@@ -17,7 +17,7 @@ If you are not sure what should become a skill, say **“Help me find a few thin
 
 User-created skills live in `skills/<name>/SKILL.md`. They remain ordinary readable files so Home Base can use them across supported agents.
 
-This user-owned directory is separate from the 41 maintained repository Skills
+This user-owned directory is separate from the 42 maintained repository Skills
 that ship under `.agents/skills/` and `.claude/skills/`. A Home Base update can
 propose changes to a bundled Skill while preserving local customizations through
 the three-way update review; it never treats this user-owned directory as an

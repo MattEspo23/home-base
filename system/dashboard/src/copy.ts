@@ -109,3 +109,17 @@ export function themeNote(theme: ThemeStatus): { text: string; problem: boolean 
   if (notes.length) return { text: `${notes.join('; ')}${more}.${custom}`, problem: true }
   return theme.customCss ? { text: custom.trim(), problem: false } : null
 }
+
+// ------------------------------------------------------------ online copy
+
+export const ONLINE_WHERE = 'Online, locked to your Vercel sign-in'
+
+export const ONLINE_FAILURE = 'This online copy could not load. Reload the page. If Vercel asks you to sign in, use the account that owns it.'
+
+// The online copy's footer says when it was published, in the viewer's own
+// date format. A date that cannot be read is left out rather than shown wrong.
+export function onlineNote(version: string | null, publishedAt: string): string {
+  const when = new Date(publishedAt)
+  const date = publishedAt && !Number.isNaN(when.getTime()) ? ` from ${when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : ''
+  return `${version ? `Home Base ${version}. ` : ''}A copy of your Home Base${date}. It changes when your assistant updates it.`
+}

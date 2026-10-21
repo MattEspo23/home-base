@@ -40,10 +40,11 @@ The maintained Home Base instructions live in `system/`. Most people never need 
 
 ## Included Skill Vault
 
-The release contains 41 editable repository Skills out of the box:
+The release contains 42 editable repository Skills out of the box:
 
-- 14 Home Base core workflows for setup, discovery, system design, Build Mode,
-  capability review, updates, dashboard styling, and learning; and
+- 15 Home Base core workflows for setup, discovery, system design, Build Mode,
+  capability review, updates, dashboard styling, putting the dashboard
+  online, and learning; and
 - 27 packages pinned from the public
   [EspoAI Skill Vault](https://github.com/MattEspo23/skills) `v0.1.3` release
   at commit `cf0df42008cdffa79556a35ef79b803d3b2f19d7`.

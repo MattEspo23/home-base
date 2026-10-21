@@ -67,6 +67,15 @@ checks every fingerprint, and then finishes. See
   never touch. Hard-to-read colours keep the default, and a theme the
   dashboard cannot use is skipped with a note. The default look is unchanged.
   See “Make it yours” in [the dashboard guide](./system/dashboard/README.md).
+- **Your dashboard on your phone (optional).** Say “put my dashboard online”
+  and your assistant puts a copy of the dashboard’s own view on your own free
+  Vercel account, locked to your Vercel sign-in, never public. A harmless
+  placeholder goes up first; your copy follows only after
+  `node system/dashboard/publish.mjs --check-locked` confirms that Vercel asks
+  for a sign-in on every address. It lists every file before upload and
+  refuses links and anything that looks like a password or private detail.
+  Say “update my online dashboard” after changes. See
+  [Put the dashboard online](./system/workflows/put-the-dashboard-online.md).
 - **A private `instance/` folder.** Put private tools, dashboard modules,
   private skills, and other files that are only yours in `instance/`. Updates,
   packages, and proofs never read, copy, or delete it, and Git ignores it.

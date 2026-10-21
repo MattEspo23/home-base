@@ -1,7 +1,7 @@
 // Generated from src/main.ts by system/dashboard/build.mjs. Do not edit.
-import { RequestFailed, dbName, getModules, getStatus, getTheme } from './api.js'
+import { RequestFailed, dbName, getModules, getStatus, getTheme, isStatic, publishedAt } from './api.js'
 
-import { STEPS, checkedLabel, howToOpen, nextStep, notShown, progress, stateLabel, themeNote } from './copy.js'
+import { ONLINE_FAILURE, ONLINE_WHERE, STEPS, checkedLabel, howToOpen, nextStep, notShown, onlineNote, progress, stateLabel, themeNote } from './copy.js'
 import { SAMPLE_NOTICE, formatMoney, sampleFinance, sampleHabits } from './sample.js'
 
 
@@ -354,17 +354,19 @@ async function start()                {
   }
   dropKey()
   window.addEventListener('hashchange', dropKey)
+  if (isStatic) body('where-text').textContent = ONLINE_WHERE
   let status
   try {
     status = await getStatus()
   } catch (error) {
-    const message = FAILURES[error instanceof RequestFailed ? error.reason : 'other']
+    const message = isStatic ? ONLINE_FAILURE : FAILURES[error instanceof RequestFailed ? error.reason : 'other']
     for (const id of ['home-body', 'assistants-body', 'domains-body']) body(id).replaceChildren(el('p', 'error', message))
     return
   }
   renderHome(status)
   renderAssistants(status)
-  if (status.version) body('foot-note').textContent = `Home Base ${status.version}. Reads a few names from your Home Base folder. It only writes its own settings file.`
+  if (isStatic) body('foot-note').textContent = onlineNote(status.version, publishedAt)
+  else if (status.version) body('foot-note').textContent = `Home Base ${status.version}. Reads a few names from your Home Base folder. It only writes its own settings file.`
   void renderTheme()
   let modules                   = []
   try { modules = (await getModules()).modules } catch { modules = [] }

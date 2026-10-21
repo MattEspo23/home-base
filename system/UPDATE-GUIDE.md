@@ -86,7 +86,7 @@ an outside action: the agent shows the preview and asks for your approval at
 that moment before it runs the same command with `--apply`. `--remove`
 previews removing only the links that point into this `instance/`, and
 `--remove --apply` deletes them after the same approval. Names must be kebab-case and may
-not reuse one of the 41 repository Skill names.
+not reuse one of the 42 repository Skill names.
 
 ## What the comparison means
 

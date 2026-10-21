@@ -14,8 +14,14 @@
 // leaves 127.0.0.1; nothing scrolls sideways at 375 px; a link from another
 // site that carries the key still signs in; a theme applies through
 // same-origin stylesheets and an invalid one is explained in the footer.
+// Then the online copy: publish.mjs writes the placeholder and the snapshot of
+// the same fixture, a tiny local server serves that folder the way Vercel
+// would (only the listed files, with the vercel.json headers), and the page
+// renders from status.json in static mode under the same policy.
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,6 +50,29 @@ write('instance/dashboard/modules.json', JSON.stringify({ modules: [{ id: 'smoke
 write('instance/dashboard/modules/smoke/index.js', 'export function mount(element) { const p = document.createElement("p"); p.textContent = "Smoke module mounted"; element.append(p) }\n')
 
 const cleanups = []
+
+// Serves a published folder the way Vercel would: only the files its
+// manifest lists, each with the headers from its vercel.json.
+async function serveSnapshot(folder) {
+  const port = await freePort()
+  const listed = new Set(JSON.parse(fs.readFileSync(path.join(folder, 'ONLINE-MANIFEST.json'), 'utf8')).files.map((item) => item.path))
+  const headers = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(folder, 'vercel.json'), 'utf8')).headers[0].headers.map((item) => [item.key, item.value]))
+  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' }
+  const server = http.createServer((request, response) => {
+    const name = new URL(request.url, 'http://127.0.0.1').pathname.slice(1) || 'index.html'
+    if (request.method !== 'GET' || !listed.has(name) || name === 'vercel.json') {
+      response.writeHead(404, headers)
+      response.end()
+      return
+    }
+    response.writeHead(200, { ...headers, 'content-type': types[path.extname(name)] })
+    response.end(fs.readFileSync(path.join(folder, ...name.split('/'))))
+  })
+  await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve))
+  cleanups.push(() => server.close())
+  return `http://127.0.0.1:${port}`
+}
+
 async function main() {
   const port = await freePort()
   const key = await startDashboard(dashboardDir, home, port, cleanups)
@@ -124,6 +153,32 @@ async function main() {
   // 6. A wrong key is explained, not accepted.
   await open(`${origin}/#key=${'A'.repeat(43)}`, `document.getElementById('status').textContent.includes('does not match')`)
 
+  // 6b. The online copy renders from status.json under the same policy, with
+  //     the theme and the module, and holds no key and no file bodies.
+  write('instance/dashboard/theme.json', fs.readFileSync(path.join(dashboardDir, 'themes', 'soft.json')))
+  const onlineDir = path.join(scratch, 'online', 'home-base-dashboard')
+  for (const args of [['--placeholder', '--out', onlineDir], ['--out', onlineDir]]) {
+    const run = spawnSync(process.execPath, [path.join(dashboardDir, 'publish.mjs'), '--home-base', home, ...args], { encoding: 'utf8' })
+    assert.equal(run.status, 0, run.stderr)
+  }
+  fs.rmSync(path.join(home, 'instance/dashboard/theme.json'))
+  const staticOrigin = await serveSnapshot(onlineDir)
+  await page('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })
+  await open(`${staticOrigin}/`, `document.querySelector('#home-body .next') !== null && document.body.innerText.includes('Smoke module mounted')`)
+  const onlineText = await text()
+  for (const expected of ['Your Home Base', 'Lake trip', 'Codex', 'Verified', '1 more entry not shown', 'Smoke module mounted', 'A copy of your Home Base from']) {
+    assert.ok(onlineText.toLowerCase().includes(expected.toLowerCase()), `${expected} online in: ${onlineText.slice(0, 400)}`)
+  }
+  assert.equal(await evaluate("document.getElementById('where-text').textContent"), 'Online, locked to your Vercel sign-in')
+  assert.ok(!onlineText.includes(PRIVATE) && !onlineText.includes(key), 'no file bodies and no key online')
+  assert.equal(await evaluate("getComputedStyle(document.body).backgroundColor"), 'rgb(247, 243, 238)', 'the theme goes online too')
+  assert.equal(await evaluate("document.getElementById('foot-theme').textContent"), 'Theme: Soft.')
+  await page('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true })
+  await open(`${staticOrigin}/`, `document.querySelector('#home-body .next') !== null`)
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= 375'), 'no horizontal scroll at 375 px online')
+  await page('Emulation.clearDeviceMetricsOverride')
+  await page('Emulation.setEmulatedMedia', { features: [] })
+
   // 7. No console errors (CSP or Trusted Types violations surface here), and
   //    no request left 127.0.0.1 or localhost on this port.
   const problems = events.filter((event) =>
@@ -132,7 +187,7 @@ async function main() {
     (event.method === 'Runtime.consoleAPICalled' && event.params.type === 'error'))
   assert.deepEqual(problems.map((event) => JSON.stringify(event.params).slice(0, 200)), [])
   const requested = events.filter((event) => event.method === 'Network.requestWillBeSent').map((event) => event.params.request.url)
-  const outside = requested.filter((url) => !url.startsWith(`${origin}/`) && !url.startsWith(`http://localhost:${port}/`) && url !== 'about:blank')
+  const outside = requested.filter((url) => !url.startsWith(`${origin}/`) && !url.startsWith(`http://localhost:${port}/`) && !url.startsWith(`${staticOrigin}/`) && url !== 'about:blank')
   assert.deepEqual(outside, [], 'no outside requests')
   console.log(`Browser smoke test passed (${path.basename(browserPath)}, ${requested.length} requests, all local).`)
 }

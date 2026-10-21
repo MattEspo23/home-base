@@ -11,6 +11,13 @@ function meta(name: string): string {
 const launchNonce: string = meta('home-base-token')
 export const dbName: string = meta('home-base-db')
 
+// The online copy (system/dashboard/publish.mjs) is the same page in static
+// mode: it has no key, cookie, or nonce of its own and reads plain JSON files
+// written next to it when it was published. The host's own sign-in protects
+// every file, and the browser sends that sign-in with same-origin requests.
+export const isStatic: boolean = meta('home-base-mode') === 'static'
+export const publishedAt: string = meta('home-base-published')
+
 // Why a request failed, in terms the page can explain.
 export type FailureReason = 'stale-page' | 'no-session' | 'no-fetch-metadata' | 'not-running' | 'other'
 
@@ -26,7 +33,7 @@ async function getJson<T>(path: string): Promise<T> {
   let response: Response
   try {
     response = await fetch(path, {
-      headers: { 'x-home-base-token': launchNonce },
+      headers: isStatic ? {} : { 'x-home-base-token': launchNonce },
       credentials: 'same-origin',
       cache: 'no-store',
       redirect: 'error',
@@ -42,6 +49,6 @@ async function getJson<T>(path: string): Promise<T> {
   return (await response.json()) as T
 }
 
-export const getStatus = (): Promise<HomeBaseStatus> => getJson<HomeBaseStatus>('/api/status')
-export const getModules = (): Promise<{ modules: InstanceModule[] }> => getJson<{ modules: InstanceModule[] }>('/api/modules')
-export const getTheme = (): Promise<ThemeStatus> => getJson<ThemeStatus>('/api/theme')
+export const getStatus = (): Promise<HomeBaseStatus> => getJson<HomeBaseStatus>(isStatic ? '/status.json' : '/api/status')
+export const getModules = (): Promise<{ modules: InstanceModule[] }> => getJson<{ modules: InstanceModule[] }>(isStatic ? '/modules.json' : '/api/modules')
+export const getTheme = (): Promise<ThemeStatus> => getJson<ThemeStatus>(isStatic ? '/theme-status.json' : '/api/theme')
