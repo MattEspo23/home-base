@@ -428,6 +428,50 @@ test('a lock check is recorded only in a folder this tool set up, expires, and n
   assert.ok(!fs.readFileSync(path.join(out, VERCEL_IGNORE), 'utf8').includes(LOCK_RECORD))
 })
 
+test('an automatic update needs a lock check, never makes the first upload, and never adds a file', () => {
+  const root = fixture()
+  const out = path.join(scratch, 'out-auto', 'home-base-dashboard')
+  const run = (...args) => spawnSync(process.execPath, [publishScript, '--home-base', root, ...args], { encoding: 'utf8' })
+  assert.equal(run('--placeholder', '--out', out).status, 0)
+  write(out, '.vercel/project.json', '{ "projectId": "prj_fixture", "projectName": "home-base-dashboard" }\n')
+  // (c) Never the first upload: the folder still holds only the placeholder.
+  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'])
+  const first = run('--out', out, '--auto')
+  assert.equal(first.status, 1)
+  assert.match(first.stderr, /never makes the first upload/)
+  assert.ok(fs.existsSync(path.join(out, LOCK_RECORD)), 'a refusal leaves the folder, record included, as it was')
+  // The user's own first upload, after seeing the list.
+  assert.equal(run('--out', out).status, 0)
+  // (a) Every automatic run needs its own passing lock check.
+  const unchecked = run('--out', out, '--auto')
+  assert.equal(unchecked.status, 1)
+  assert.match(unchecked.stderr, /check the lock first/)
+  // Same files, new contents: allowed.
+  write(root, 'projects/INDEX.md', '## Active\n\n- [Garden plan](garden.md) — fictional\n')
+  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'])
+  const same = run('--out', out, '--auto')
+  assert.equal(same.status, 0, same.stderr)
+  assert.match(same.stdout, /Automatic update: the same files as the last upload/)
+  assert.match(fs.readFileSync(path.join(out, 'status.json'), 'utf8'), /Garden plan/)
+  // (b) A file the last upload did not have (a new module) stops and asks.
+  write(root, 'instance/dashboard/modules.json', JSON.stringify({ modules: [
+    { id: 'reading', title: 'Reading list', entry: 'index.js' },
+    { id: 'garden', title: 'Garden', entry: 'index.js' },
+  ] }))
+  write(root, 'instance/dashboard/modules/garden/index.js', 'export function mount(element) { element.textContent = "Garden" }\n')
+  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'])
+  const before = listFiles(out)
+  const added = run('--out', out, '--auto')
+  assert.equal(added.status, 1)
+  assert.match(added.stderr, /files the last upload did not have \(instance-modules\/garden\/index\.js\)/)
+  assert.deepEqual(listFiles(out), before, 'nothing was written')
+  // The user can still publish it after seeing the list and saying yes.
+  assert.equal(run('--out', out).status, 0)
+  // --auto only goes with --out.
+  assert.equal(run('--placeholder', '--out', out, '--auto').status, 2)
+  assert.equal(run('--check-locked', 'https://home-base-dashboard.vercel.app', '--out', out, '--auto').status, 2)
+})
+
 test('the pinned Vercel CLI is an exact version', () => {
   assert.match(VERCEL_CLI, /^vercel@\d+\.\d+\.\d+$/)
 })

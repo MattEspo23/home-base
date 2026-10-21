@@ -13,4 +13,7 @@ Confirm the Vercel account or team with the user first and pass
 not name. Lock first: upload the placeholder, turn on Vercel Authentication for All
 Deployments, and upload the real copy only after
 `node system/dashboard/publish.mjs --check-locked` passes. Ask before every
-upload. Never make it public, and never handle a Vercel token.
+upload, unless the user asked for automatic updates and that standing yes is
+recorded in `you/PREFERENCES.md`; then follow the workflow's automatic steps
+(`--auto`, between two passing lock checks). Never make it public, and never
+handle a Vercel token.

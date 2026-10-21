@@ -31,6 +31,18 @@ supported way is `system/workflows/put-the-dashboard-online.md`: a harmless
 placeholder goes up first, and the real copy only after
 `node system/dashboard/publish.mjs --check-locked` passes.
 
+One exception to asking at the moment of action: if the user explicitly asks
+for automatic updates of their online dashboard, and that standing yes is
+recorded in `you/PREFERENCES.md` (their words, the date, the project, and the
+Vercel team or account), you may re-publish the dashboard’s own copy to that
+same, already-locked project at the end of a session without asking again.
+Only through `node system/dashboard/publish.mjs --out <folder> --auto`, only
+after `--check-locked` passes first, and with the lock checked again
+afterwards; if a check fails or `--auto` refuses, upload nothing (or put the
+placeholder back) and ask. It never covers a first upload, a new file or
+module, another project, team, or account, or a change to the lock. The user
+can withdraw it at any time.
+
 ## Ask at the moment of action
 
 Require explicit confirmation before:

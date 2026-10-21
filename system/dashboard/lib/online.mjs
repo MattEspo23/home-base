@@ -457,6 +457,24 @@ export function requireLockCheck(realOut, now = new Date()) {
   if (reasons.length) throw new PublishRefused(reasons)
 }
 
+// ------------------------------------------------------- automatic update
+
+// An automatic update (a standing yes the user recorded) only re-publishes the
+// same kind of copy the user already saw go online: never a first upload, and
+// never a file path the previous copy did not have (a new module, a new file).
+// Anything else stops so the assistant can show the list and ask.
+export function requireSameFiles(previous, files) {
+  if (previous?.kind !== 'snapshot' || !Array.isArray(previous.files)) {
+    throw new PublishRefused(['an automatic update never makes the first upload of your dashboard; show the file list and ask the user'])
+  }
+  const before = new Set(previous.files.map((item) => item?.path).filter((item) => typeof item === 'string'))
+  const added = [...files.keys()].filter((name) => !before.has(name)).sort()
+  if (added.length) {
+    const shown = added.slice(0, 10).join(', ')
+    throw new PublishRefused([`this copy has files the last upload did not have (${shown}${added.length > 10 ? `, and ${added.length - 10} more` : ''}); an automatic update stops here: show the file list and ask the user`])
+  }
+}
+
 // ------------------------------------------------------------ lock check
 
 // Paths asked for on each address: the page, the data, and an asset.

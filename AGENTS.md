@@ -135,4 +135,11 @@ plugins, configured connectors, authenticated accounts, or permission to act.
   verified locked to the owner’s own login
   (`node system/dashboard/publish.mjs --check-locked` passes), and never make
   it public.
+- One exception (also in `system/SAFETY.md`): if the user explicitly asked
+  for automatic updates of their online dashboard and that is recorded in
+  `you/PREFERENCES.md`, re-publish the dashboard’s own copy to that same
+  locked project without asking again, only with `publish.mjs --out <folder>
+  --auto` between two passing lock checks (see
+  `system/workflows/put-the-dashboard-online.md`). If anything refuses or
+  fails, upload nothing and ask.
 - Do not rely on agent-native memory alone for information the user expects to carry between tools. Propose an appropriate Home Base file instead.

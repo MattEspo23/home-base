@@ -190,7 +190,8 @@ installed, saves pictures of a fictional sample Home Base.
 - **Online, on your phone and computer:** optional. Say “put my dashboard
   online.” Your assistant puts a copy of the dashboard’s own view (not your
   folder) on your own free Vercel account, locked so only you can open it
-  after signing in with Vercel, and updates it when you ask. See
+  after signing in with Vercel, and updates it when you ask (or, if you ask
+  for it, automatically at the end of a session). See
   [Put the dashboard online](../workflows/put-the-dashboard-online.md).
 
 ## Private modules

@@ -102,21 +102,48 @@ Add to Home screen).
 
 ## Keeping it fresh
 
-After changes, the user says “update my online dashboard.” Run
-`--check-locked <production address> --out <folder>` first, then
-`--out <folder>`, show the list, and with the user’s yes deploy
-`--prod --scope <scope>` (the same team or account as before). Then check the
-production and new deployment addresses again. Hobby allows 100 uploads a
-day.
+There are two ways. Asking each time is the default; automatic updates are
+only for a user who asks for them. Hobby allows 100 uploads a day.
 
-At the end of a session where Home Base changed, you may offer once to update
-the online copy. Every update still needs the user’s yes at that moment,
-after they have seen the file list; an earlier yes does not carry over.
+**Asking each time.** After changes, the user says “update my online
+dashboard.” Run `--check-locked <production address> --out <folder>` first,
+then `--out <folder>`, show the list, and with the user’s yes deploy
+`--prod --scope <scope>` (the same team or account as before). Then check the
+production and new deployment addresses again. At the end of a session where
+Home Base changed, you may offer once to do this.
+
+**Automatic updates (only if the user asks).** If the user explicitly asks
+for automatic updates (for example “update my online dashboard automatically
+at the end of each session where Home Base changed”), confirm it in one
+sentence and record it in `you/PREFERENCES.md` under a “Standing approvals” heading:
+their exact words, the date, the project name, the production address, and
+`<scope>`. That standing yes covers only putting a new copy of the dashboard’s
+own view on that same, already-locked project in that same team or account.
+Nothing else: not a new project, team, or account, not the lock settings, and
+not taking it down. The user can stop it any time by saying so; then remove
+the note.
+
+When it is on, at the end of each session where Home Base changed:
+
+1. `node system/dashboard/publish.mjs --check-locked <production address> --out <folder>`.
+   If it does not pass, upload nothing: put the placeholder back (see above),
+   tell the user what the check said, and ask.
+2. `node system/dashboard/publish.mjs --out <folder> --auto`. It refuses the
+   first upload and any file the last upload did not have (a new module or a
+   new file). If it refuses, upload nothing: show the user the list and ask,
+   as in “Asking each time.”
+3. Deploy with the same command and `--scope <scope>`, without asking.
+4. Check again: `--check-locked <production address> <new deployment address>
+   --out <folder>`. If it fails, put the placeholder back at once, tell the
+   user, and ask.
+5. Tell the user in one line that the online copy was updated, or why not.
 
 ## Never
 
 - Upload anything from Home Base before `--check-locked` passes on that
   project, or make it public.
+- Update automatically unless the user asked for it and it is recorded in
+  `you/PREFERENCES.md`, or without `--auto`.
 - Upload to, or change a project in, a team or account the user did not name,
   or run a `vercel` command without `--scope <scope>`.
 - Turn Vercel Authentication off, or choose Standard Protection: either one

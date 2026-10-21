@@ -5,7 +5,7 @@
 //
 //   node system/dashboard/publish.mjs --placeholder --out <folder>
 //   node system/dashboard/publish.mjs --check-locked <https address> [<https address> ...] --out <folder>
-//   node system/dashboard/publish.mjs --out <folder> [--home-base <folder>]
+//   node system/dashboard/publish.mjs --out <folder> [--home-base <folder>] [--auto]
 //
 // --placeholder writes a harmless "This Home Base is locked" page and reads
 // nothing from Home Base. --check-locked asks each address for the page, the
@@ -15,7 +15,8 @@
 // and counts, never file contents) into a folder the placeholder was uploaded
 // from, only within 30 minutes after a passing check recorded there, and
 // lists every file that will go online. The output folder must be outside the
-// Home Base folder.
+// Home Base folder. --auto is for an automatic update the user opted into: it
+// also refuses a first upload and any file the last upload did not have.
 //
 // This script never contacts Vercel and never uploads anything; the official
 // Vercel CLI does that. It never reads Vercel sign-in files or tokens.
@@ -38,13 +39,15 @@ const NPX = `npx --yes ${online.VERCEL_CLI}`
 const USAGE = `Usage:
   ${COMMAND} --placeholder --out <folder>
   ${COMMAND} --check-locked <https address> [<https address> ...] --out <folder>
-  ${COMMAND} --out <folder> [--home-base <folder>]
+  ${COMMAND} --out <folder> [--home-base <folder>] [--auto]
 
   --placeholder          write the harmless locked page (reads nothing from Home Base)
   --check-locked         pass only if every address asks for a Vercel sign-in, and
                          record the pass in the --out folder (the real copy needs one
                          from the last 30 minutes)
   --out <folder>         the folder to upload from, outside your Home Base folder
+  --auto                 an automatic update the user opted into: refuses a first
+                         upload and any file the last upload did not have
   --home-base <folder>   another Home Base folder (default: the one this file is in);
                          with --placeholder it only names the folder to stay out of`
 
@@ -56,6 +59,7 @@ function parseArguments(argv) {
     const flag = argv[index]
     if (flag === '--help') return { help: true }
     if (flag === '--placeholder') { options.placeholder = true; continue }
+    if (flag === '--auto') { options.auto = true; continue }
     if (flag === '--check-locked') {
       options.checkLocked = true
       while (argv[index + 1] !== undefined && !argv[index + 1].startsWith('--')) options.addresses.push(argv[(index += 1)])
@@ -70,13 +74,14 @@ function parseArguments(argv) {
     index += 1
   }
   if (options.checkLocked) {
-    if (options.placeholder) throw new UsageError('--check-locked is used without --placeholder')
+    if (options.placeholder || options.auto) throw new UsageError('--check-locked is used without --placeholder or --auto')
     if (options.addresses.length === 0) throw new UsageError('--check-locked needs at least one https address')
     if (options.addresses.some((address) => !online.lockCheckOrigin(address))) throw new UsageError('--check-locked takes https addresses only, such as https://<your-project>.vercel.app')
     if (!options.out) throw new UsageError('--check-locked needs --out <folder>, the folder you upload from, so the result is recorded there')
     return options
   }
   if (!options.out) throw new UsageError('--out <folder> is required')
+  if (options.auto && options.placeholder) throw new UsageError('--auto is used without --placeholder')
   return options
 }
 
@@ -148,9 +153,11 @@ async function main() {
     const { files } = online.buildSnapshot(realRoot, { distDir: path.join(dashboardDir, 'dist'), now: createdAt })
     const reasons = online.scanFiles(files)
     if (reasons.length) throw new online.PublishRefused(reasons)
+    if (options.auto) online.requireSameFiles(previous, files)
     const manifest = online.writeOutput(realOut, previous, files, { kind: 'snapshot', createdAt: createdAt.toISOString() })
     printList(manifest, realOut)
     console.log('status.json holds only the names and counts your dashboard shows, never file contents.')
+    if (options.auto) console.log('Automatic update: the same files as the last upload, with new contents. The lock was checked.')
     console.log('Upload only if --check-locked passed on this project:')
     console.log(`  ${NPX} deploy --cwd "${realOut}" --prod --yes --scope <scope>`)
     console.log(`Then check again: ${COMMAND} --check-locked <production address> <new deployment address> --out "${realOut}"`)
