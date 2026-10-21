@@ -4,13 +4,13 @@
 // The steps are in system/workflows/put-the-dashboard-online.md.
 //
 //   node system/dashboard/publish.mjs --placeholder --out <folder>
-//   node system/dashboard/publish.mjs --check-locked <https address> [<https address> ...] [--out <folder>]
+//   node system/dashboard/publish.mjs --check-locked <https address> [<https address> ...] --out <folder>
 //   node system/dashboard/publish.mjs --out <folder> [--home-base <folder>]
 //
 // --placeholder writes a harmless "This Home Base is locked" page and reads
 // nothing from Home Base. --check-locked asks each address for the page, the
 // data, and an asset without any sign-in, and passes only when every answer is
-// Vercel's own sign-in wall; with --out it records the pass in that folder.
+// Vercel's own sign-in wall, and records the pass in the --out folder.
 // --out writes a static copy of exactly what the local dashboard shows (names
 // and counts, never file contents) into a folder the placeholder was uploaded
 // from, only within 30 minutes after a passing check recorded there, and
@@ -37,12 +37,12 @@ const COMMAND = 'node system/dashboard/publish.mjs'
 const NPX = `npx --yes ${online.VERCEL_CLI}`
 const USAGE = `Usage:
   ${COMMAND} --placeholder --out <folder>
-  ${COMMAND} --check-locked <https address> [<https address> ...] [--out <folder>]
+  ${COMMAND} --check-locked <https address> [<https address> ...] --out <folder>
   ${COMMAND} --out <folder> [--home-base <folder>]
 
   --placeholder          write the harmless locked page (reads nothing from Home Base)
-  --check-locked         pass only if every address asks for a Vercel sign-in;
-                         with --out, record the pass there (the real copy needs one
+  --check-locked         pass only if every address asks for a Vercel sign-in, and
+                         record the pass in the --out folder (the real copy needs one
                          from the last 30 minutes)
   --out <folder>         the folder to upload from, outside your Home Base folder
   --home-base <folder>   another Home Base folder (default: the one this file is in);
@@ -73,6 +73,7 @@ function parseArguments(argv) {
     if (options.placeholder) throw new UsageError('--check-locked is used without --placeholder')
     if (options.addresses.length === 0) throw new UsageError('--check-locked needs at least one https address')
     if (options.addresses.some((address) => !online.lockCheckOrigin(address))) throw new UsageError('--check-locked takes https addresses only, such as https://<your-project>.vercel.app')
+    if (!options.out) throw new UsageError('--check-locked needs --out <folder>, the folder you upload from, so the result is recorded there')
     return options
   }
   if (!options.out) throw new UsageError('--out <folder> is required')
@@ -97,20 +98,18 @@ function printList(manifest, realOut) {
 
 async function runCheck(options) {
   // Refuse a bad output folder before any request is made.
-  const realRoot = options.out ? homeBaseRoot(options.homeBase ?? path.resolve(dashboardDir, '..', '..')) : null
-  if (options.out) online.prepareOutput(options.out, realRoot, { requireManifest: true })
+  const realRoot = homeBaseRoot(options.homeBase ?? path.resolve(dashboardDir, '..', '..'))
+  online.prepareOutput(options.out, realRoot, { requireManifest: true })
   const { locked, results } = await online.checkLocked(options.addresses)
   for (const result of results) console.log(`  ${result.ok ? 'ok     ' : 'NOT OK '} ${result.url}  ${result.status ?? '---'}  ${result.why}`)
   if (locked) {
     console.log(`Locked: every address asked for a Vercel sign-in (${results.length} anonymous requests, no cookies).`)
-    if (options.out) {
-      const origins = options.addresses.map((address) => online.lockCheckOrigin(address))
-      const realOut = online.recordLockCheck(options.out, realRoot, origins)
-      console.log(`Recorded in ${realOut}: the real copy can be built there in the next 30 minutes.`)
-    }
+    const origins = options.addresses.map((address) => online.lockCheckOrigin(address))
+    const realOut = online.recordLockCheck(options.out, realRoot, origins)
+    console.log(`Recorded in ${realOut}: the real copy can be built there in the next 30 minutes.`)
     return 0
   }
-  if (options.out) online.clearLockRecord(options.out, realRoot)
+  online.clearLockRecord(options.out, realRoot)
   console.log('NOT LOCKED: at least one address did not ask for a Vercel sign-in.')
   console.log('Stop. Do not upload your dashboard. Put the placeholder back now:')
   console.log(`  ${COMMAND} --placeholder --out <folder>`)

@@ -57,7 +57,8 @@ Say it plainly, then do it one step at a time:
       `node system/dashboard/publish.mjs --placeholder --out <folder>`, then
       `npx --yes vercel@62.1.0 deploy --cwd <folder> --prod --yes --scope <scope>`.
       The first upload creates the project in that team or account. The
-      deployment address it prints ends in `-<scope>.vercel.app`; if it does
+      deployment address it prints ends in `-<scope>.vercel.app`, with the
+      slug exactly as `teams list` showed it; if it does
       not, stop and look at the project at vercel.com with the user. Note
       the production address it shows (for example
       `https://<project>.vercel.app`) and the deployment address on its last

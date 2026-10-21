@@ -433,8 +433,22 @@ export function requireLockCheck(realOut, now = new Date()) {
   }
   const recordPath = path.join(realOut, LOCK_RECORD)
   let checkedAt = Number.NaN
+  let addresses = []
   if (lstat(recordPath)?.isFile()) {
-    try { checkedAt = Date.parse(JSON.parse(fs.readFileSync(recordPath, 'utf8')).checkedAt) } catch { checkedAt = Number.NaN }
+    try {
+      const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'))
+      checkedAt = Date.parse(record.checkedAt)
+      addresses = Array.isArray(record.addresses) ? record.addresses : []
+    } catch { checkedAt = Number.NaN }
+  }
+  // When the Vercel CLI noted the project's name, every checked address must
+  // be one of that project's own (its addresses start with the name).
+  let projectName = null
+  try { projectName = JSON.parse(fs.readFileSync(path.join(realOut, '.vercel', 'project.json'), 'utf8')).projectName } catch { projectName = null }
+  if (typeof projectName === 'string' && projectName && Number.isFinite(checkedAt)) {
+    const prefix = projectName.toLowerCase()
+    const foreign = addresses.filter((address) => { try { return !new URL(address).hostname.toLowerCase().startsWith(prefix) } catch { return true } })
+    if (addresses.length === 0 || foreign.length) reasons.push(`the lock was checked on an address that is not this project’s (${projectName}); check the addresses the upload printed`)
   }
   const age = now.getTime() - checkedAt
   if (!Number.isFinite(checkedAt) || age < -60_000 || age > LOCK_RECORD_MAX_AGE_MS) {
