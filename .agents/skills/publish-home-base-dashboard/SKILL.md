@@ -8,7 +8,9 @@ description: Put the Home Base dashboard online on the user's own Vercel account
 Read `system/workflows/put-the-dashboard-online.md` from the Home Base root in
 full and follow it.
 
-Lock first: upload the placeholder, turn on Vercel Authentication for All
+Confirm the Vercel account or team with the user first and pass
+`--scope <scope>` to every `vercel` command; never upload to a team they did
+not name. Lock first: upload the placeholder, turn on Vercel Authentication for All
 Deployments, and upload the real copy only after
 `node system/dashboard/publish.mjs --check-locked` passes. Ask before every
 upload. Never make it public, and never handle a Vercel token.

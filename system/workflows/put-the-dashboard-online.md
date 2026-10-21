@@ -32,23 +32,36 @@ Say it plainly, then do it one step at a time:
    Vercel command-line tool (`vercel@62.1.0`, about 10 MB plus its
    dependencies) from npm. You never ask for, read, print, or store a Vercel
    token or the CLI’s sign-in files.
-3. **The folder.** Use a new folder outside Home Base named
+3. **Confirm where it goes.** A Vercel sign-in can belong to more than one
+   team, for example a work team as well as the user’s own Hobby account,
+   and the CLI may pick a work team by default. Everyone on a team can open
+   that team’s locked projects, so a work team would show the user’s
+   Home Base to colleagues. Run `npx --yes vercel@62.1.0 whoami` and
+   `npx --yes vercel@62.1.0 teams list`, show the user the account and the
+   teams, and ask which one to use. Use only a team or account the user
+   names (normally their own Hobby account); if they are unsure, stop and
+   let them check at vercel.com. Its short name (slug), as `teams list`
+   shows it, is `<scope>`: pass `--scope <scope>` to every `vercel` command
+   below, every time, and never rely on the CLI’s default.
+4. **The folder.** Use a new folder outside Home Base named
    `home-base-dashboard`, next to the Home Base folder unless the user picks
    another place. Its name becomes the project name.
-4. **The lock, before anything private goes up.** Ask before each upload and
+5. **The lock, before anything private goes up.** Ask before each upload and
    before changing the Vercel project.
    1. Upload the harmless placeholder:
       `node system/dashboard/publish.mjs --placeholder --out <folder>`, then
-      `npx --yes vercel@62.1.0 deploy --cwd <folder> --prod --yes`. The first
-      upload creates the project. Note the production address it prints (for
+      `npx --yes vercel@62.1.0 deploy --cwd <folder> --prod --yes --scope <scope>`.
+      The first upload creates the project in that team or account; check
+      that the address it prints belongs to it before going on. Note the production address it prints (for
       example `https://home-base-dashboard.vercel.app`) and the deployment
       address on its last line.
    2. Turn on the lock. Either the user does it at vercel.com: open the
       project, Settings, Deployment Protection, turn on Vercel
       Authentication, choose **All Deployments**, Save. Or, with their yes,
       you run
-      `printf '%s' '{"ssoProtection":{"deploymentType":"all"}}' | npx --yes vercel@62.1.0 api /v9/projects/home-base-dashboard -X PATCH --input - --silent`.
-      (Use the project’s own name if the folder has another name.) It uses
+      `printf '%s' '{"ssoProtection":{"deploymentType":"all"}}' | npx --yes vercel@62.1.0 api '/v9/projects/home-base-dashboard?slug=<scope>' -X PATCH --input - --silent --scope <scope>`.
+      (Use the project’s own name if the folder has another name; `slug`
+      names the same team or account so the change cannot land elsewhere.) It uses
       the CLI’s own sign-in, and `--silent` keeps the project’s
       settings, which can hold secrets, out of the chat. The default,
       Standard Protection, leaves the production address open, so it is not
@@ -67,7 +80,7 @@ Say it plainly, then do it one step at a time:
 If a check fails at any point, stop. Put the placeholder back at once
 (`--placeholder --out <folder>`, then deploy `--prod`), tell the user what
 the check said, and ask before removing an exposed deployment with
-`npx --yes vercel@62.1.0 remove <deployment address>`. Fix the lock and check
+`npx --yes vercel@62.1.0 remove <deployment address> --scope <scope>`. Fix the lock and check
 again before trying the real copy.
 
 ## On the phone
@@ -80,7 +93,8 @@ Add to Home screen).
 
 After changes, the user says “update my online dashboard.” Run
 `--check-locked` on the production address first, then `--out <folder>`,
-show the list, deploy `--prod`, and check the production and new deployment
+show the list, deploy `--prod --scope <scope>` (the same team or account as
+before), and check the production and new deployment
 addresses again. Hobby allows 100 uploads a day.
 
 At the end of the setup, offer once to do this automatically at the end of
@@ -92,6 +106,8 @@ project, and each run still checks the lock first and stops if it fails.
 
 - Upload anything from Home Base before `--check-locked` passes on that
   project, or make it public.
+- Upload to, or change a project in, a team or account the user did not name,
+  or run a `vercel` command without `--scope <scope>`.
 - Turn Vercel Authentication off, or choose Standard Protection: either one
   opens the copies already uploaded.
 - Create a Shareable Link, a protection bypass secret, or a Deployment
@@ -102,6 +118,6 @@ project, and each run still checks the lock first and stops if it fails.
 
 ## Taking it down
 
-With the user’s yes, `npx --yes vercel@62.1.0 remove home-base-dashboard`
-deletes the whole project and every copy. They can also delete it at
+With the user’s yes,
+`npx --yes vercel@62.1.0 remove home-base-dashboard --scope <scope>` deletes the whole project and every copy. They can also delete it at
 vercel.com (project, Settings, Delete Project). The local folder can then go.

@@ -101,7 +101,7 @@ async function runCheck(addresses) {
   console.log('NOT LOCKED: at least one address did not ask for a Vercel sign-in.')
   console.log('Stop. Do not upload your dashboard. Put the placeholder back now:')
   console.log(`  ${COMMAND} --placeholder --out <folder>`)
-  console.log(`  ${NPX} deploy --cwd <folder> --prod --yes`)
+  console.log(`  ${NPX} deploy --cwd <folder> --prod --yes --scope <scope>`)
   console.log('Then turn on Vercel Authentication for All Deployments and check again.')
   return 1
 }
@@ -128,7 +128,7 @@ async function main() {
       const manifest = online.writeOutput(realOut, previous, files, { kind: 'placeholder', createdAt: createdAt.toISOString() })
       printList(manifest, realOut)
       console.log('This is the locked placeholder. It holds nothing from your Home Base.')
-      console.log(`Upload it (after a yes): ${NPX} deploy --cwd "${realOut}" --prod --yes`)
+      console.log(`Upload it (after a yes): ${NPX} deploy --cwd "${realOut}" --prod --yes --scope <scope>`)
       return 0
     }
     const { realOut, previous } = online.prepareOutput(options.out, realRoot, { requireManifest: true })
@@ -139,7 +139,7 @@ async function main() {
     printList(manifest, realOut)
     console.log('status.json holds only the names and counts your dashboard shows, never file contents.')
     console.log('Upload only if --check-locked passed on this project:')
-    console.log(`  ${NPX} deploy --cwd "${realOut}" --prod --yes`)
+    console.log(`  ${NPX} deploy --cwd "${realOut}" --prod --yes --scope <scope>`)
     console.log(`Then check again: ${COMMAND} --check-locked <production address> <new deployment address>`)
     return 0
   } catch (error) {
