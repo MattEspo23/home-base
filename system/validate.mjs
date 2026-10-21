@@ -172,8 +172,18 @@ const requiredFiles = [
   'system/dashboard/serve.mjs',
   'system/dashboard/build.mjs',
   'system/dashboard/test-dashboard.mjs',
+  'system/dashboard/publish.mjs',
+  'system/dashboard/test-publish.mjs',
+  'system/dashboard/lib/online.mjs',
   'system/dashboard/lib/server.mjs',
   'system/dashboard/lib/status.mjs',
+  'system/dashboard/lib/theme.mjs',
+  'system/dashboard/lib/chrome.mjs',
+  'system/dashboard/preview-theme.mjs',
+  'system/dashboard/themes/precise.json',
+  'system/dashboard/themes/soft.json',
+  'system/dashboard/themes/night.json',
+  'system/dashboard/themes/calm.json',
   'system/dashboard/src/index.html',
   'system/dashboard/dist/index.html',
   'system/dashboard/dist/build-info.json',
@@ -211,6 +221,8 @@ const requiredFiles = [
   'system/workflows/improve-a-system.md',
   'system/workflows/plan-a-tool-connection.md',
   'system/workflows/review-an-update.md',
+  'system/workflows/style-the-dashboard.md',
+  'system/workflows/put-the-dashboard-online.md',
   'system/scenarios/scenarios.json',
   'system/scenarios/WALKTHROUGH.md',
   'you/SETUP.md',
@@ -302,6 +314,8 @@ for (const expectedReference of [
   'system/workflows/discover-sops.md',
   'system/workflows/plan-a-tool-connection.md',
   'system/workflows/review-an-update.md',
+  'system/workflows/style-the-dashboard.md',
+  'system/workflows/put-the-dashboard-online.md',
   'system/LEARNING-LOOP.md',
   'system/SAFETY.md',
   'skills/INDEX.md',
@@ -355,6 +369,8 @@ const nativeSkills = [
   ['enter-home-base-build-mode', 'system/workflows/enter-build-mode.md'],
   ['review-home-base-interface', 'system/workflows/review-interface-and-deployment.md'],
   ['improve-home-base-system', 'system/workflows/improve-a-system.md'],
+  ['style-home-base-dashboard', 'system/workflows/style-the-dashboard.md'],
+  ['publish-home-base-dashboard', 'system/workflows/put-the-dashboard-online.md'],
 ]
 
 for (const [skillName, canonicalPath] of nativeSkills) {
@@ -451,7 +467,7 @@ try {
 
 // The release version comes from the manifest. Only the stable channel stays
 // pinned to the last public stable release.
-const LAST_STABLE_VERSION = '1.1.0'
+const LAST_STABLE_VERSION = '1.2.0'
 const releaseVersion = releaseManifest?.version ?? ''
 const isPrerelease = /^1\.\d+\.\d+-dev\.\d+$/.test(releaseVersion)
 // A stable build is only ever the pinned last public stable release; a new
@@ -550,13 +566,13 @@ try {
     !license.includes('Copyright (c) 2026 Matthew Esposito') ||
     upstreamHash !== '0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5' ||
     provenance.product?.version !== releaseVersion ||
-    provenance.homeBaseCoreSkills?.length !== 13 ||
+    provenance.homeBaseCoreSkills?.length !== 15 ||
     provenance.skillVault?.commit !== skillLock.source?.commit ||
     provenance.skillVault?.projectionDigest !== skillLock.projectionDigest
   ) {
     fail('Home Base license or provenance identity is incomplete or stale')
   } else {
-    pass('Home Base root MIT, byte-verbatim upstream MIT, and 40-Skill provenance agree')
+    pass('Home Base root MIT, byte-verbatim upstream MIT, and 42-Skill provenance agree')
   }
 } catch (error) {
   fail(`Home Base license/provenance contract is invalid: ${error.message}`)

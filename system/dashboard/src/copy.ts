@@ -1,6 +1,6 @@
 // Plain-language words for the dashboard. Pure functions, so they are easy to
 // test.
-import type { AssistantState, Setup } from './types.ts'
+import type { AssistantState, Setup, ThemeStatus } from './types.ts'
 
 export const STEPS = ['Get to know you', 'Map ideas', 'Design one', 'Build it', 'Use and improve']
 const STAGE_INDEX: Record<string, number> = { orient: 0, opportunity_map: 1, blueprint: 2, build: 3, complete: 4 }
@@ -91,4 +91,35 @@ export function checkedLabel(iso: string | null): string {
   if (!iso) return 'No check date recorded'
   const [year, month, day] = iso.split('-').map(Number)
   return `Checked ${day} ${MONTHS[month - 1]} ${year}`
+}
+
+// One line in the footer: which theme applies, and in plain words why all or
+// part of it does not. The stylesheets themselves are linked by the server.
+export function themeNote(theme: ThemeStatus): { text: string; problem: boolean } | null {
+  const notes = theme.notes.slice(0, 3)
+  const more = theme.notes.length > 3 ? ` (and ${theme.notes.length - 3} more)` : ''
+  const custom = theme.customCss ? ' Your theme.css is applied.' : ''
+  if (theme.state === 'not-applied') {
+    return { text: `Theme not applied: ${notes.join('; ')}${more}. The default look is shown.${custom}`, problem: true }
+  }
+  if (theme.state === 'applied') {
+    const kept = notes.length ? ` Some colours kept the default so text stays readable: ${notes.join('; ')}${more}.` : ''
+    return { text: `Theme: ${theme.name ?? 'Your theme'}.${kept}${custom}`, problem: notes.length > 0 }
+  }
+  if (notes.length) return { text: `${notes.join('; ')}${more}.${custom}`, problem: true }
+  return theme.customCss ? { text: custom.trim(), problem: false } : null
+}
+
+// ------------------------------------------------------------ online copy
+
+export const ONLINE_WHERE = 'Online, locked to your Vercel sign-in'
+
+export const ONLINE_FAILURE = 'This online copy could not load. Reload the page. If Vercel asks you to sign in, use the account that owns it.'
+
+// The online copy's footer says when it was published, in the viewer's own
+// date format. A date that cannot be read is left out rather than shown wrong.
+export function onlineNote(version: string | null, publishedAt: string): string {
+  const when = new Date(publishedAt)
+  const date = publishedAt && !Number.isNaN(when.getTime()) ? ` from ${when.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` : ''
+  return `${version ? `Home Base ${version}. ` : ''}A copy of your Home Base${date}. It changes when your assistant updates it.`
 }

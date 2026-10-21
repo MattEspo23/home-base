@@ -74,6 +74,10 @@ Home Base is the user’s durable AI workspace. Treat the user as a person tryin
   exact `http://127.0.0.1:<port>/#key=…` address it prints, once (never
   rewrite it as `localhost`), and tell them how to stop it. If permission is
   denied, ask the user to run the command in their own Terminal window.
+- “Redesign my Home Base in this style,” “style my dashboard,” “make it look
+  like this,” or equivalent → `system/workflows/style-the-dashboard.md`
+- “Put my dashboard online,” “I want it on my phone,” “update my online
+  dashboard,” or equivalent → `system/workflows/put-the-dashboard-online.md`
 - “Does this need an app/dashboard/site?” or “deploy this” →
   `system/workflows/review-interface-and-deployment.md`
 - “Make this system better,” “what did we learn?”, or a system/project
@@ -88,7 +92,7 @@ User-created workflows are indexed in `skills/INDEX.md`; tool and connection
 records are indexed in `tools/INDEX.md`. When a request matches a skill, read
 its `SKILL.md` before doing the task.
 
-The release includes 40 repository Skills across both supported adapters. The
+The release includes 42 repository Skills across both supported adapters. The
 complete list is `system/distribution/SKILL-CATALOG.md`. A large Skill set may
 not fit in the host’s initial summary; explicit `$skill-name` invocation still
 uses the installed package. Do not confuse bundled Skills with installed
@@ -127,4 +131,16 @@ plugins, configured connectors, authenticated accounts, or permission to act.
   in a browser on this computer, including when they paste it back. Never
   write it into any file, memory, note, or index.
 - Never store secret values or highly sensitive records here.
+- Never upload Home Base content to any host unless the project is first
+  verified locked to the owner’s own login
+  (`node system/dashboard/publish.mjs --check-locked` passes), and never make
+  it public.
+- One exception (also in `system/SAFETY.md`): if the user explicitly asked
+  for automatic updates of their online dashboard and that is recorded in
+  `you/PREFERENCES.md`, re-publish the dashboard’s own copy to that same
+  locked project without asking again, only with `publish.mjs --out <folder>
+  --auto` between two passing lock checks (see
+  `system/workflows/put-the-dashboard-online.md`). If `--auto` refuses,
+  upload nothing and ask; if a lock check fails, the only upload is the
+  placeholder going back, and then ask.
 - Do not rely on agent-native memory alone for information the user expects to carry between tools. Propose an appropriate Home Base file instead.

@@ -11,7 +11,7 @@ This directory contains the maintained Home Base behavior.
 - `scenarios/` — clean-copy acceptance cases
 - `starter/` — pristine sources used to materialize user-owned files in a
   release archive; never personalized during normal use
-- `distribution/` — pinned Skill Vault lock, licenses, 40-Skill catalog,
+- `distribution/` — pinned Skill Vault lock, licenses, 42-Skill catalog,
   projection generator, and packaged release identity receipt
 - `validate.mjs` — local structural checks
 - `prove.mjs` — deterministic behavior and reference-system proof
@@ -37,11 +37,13 @@ This directory contains the maintained Home Base behavior.
 - `dashboard/` — the local, read-only Home Base dashboard: hardened
   `serve.mjs` launcher, `src/` built into the committed `dist/` by
   `build.mjs`, `test-dashboard.mjs`, and the optional `smoke-browser.mjs`
-  (drives a local Chrome or Chromium when one is installed)
+  (drives a local Chrome or Chromium when one is installed); `publish.mjs`
+  and `test-publish.mjs` put an optional copy online, locked to the owner’s
+  Vercel sign-in
 - `PROMOTION.md` — maintainer checklist for bringing private work into the
   public repository
-- `test-transition.mjs` — maintainer-only 1.0.1 → 1.1 transition, instance, and
-  rollback fixture (needs the Git history and tags; not part of the package proof)
+- `test-transition.mjs` — maintainer-only 1.0.1 → current and 1.1.0 → current
+  transition, instance, and rollback fixture (needs the Git history and tags; not part of the package proof)
 
 Files under `you/`, `work/`, `opportunities/`, `systems/`, `capabilities/`,
 `ideas/`, `memory/`, `knowledge/`, `projects/`, `skills/`, `tools/`, and

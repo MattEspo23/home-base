@@ -1,3 +1,81 @@
+# Home Base 1.2.0
+
+Version `1.2.0` is the current public stable Home Base release. It is for
+anyone who uses the local dashboard: you can now give it your own look, and
+you can choose to open it on your phone through a locked copy on your own
+Vercel account. Nothing goes online unless you ask, and your own files are
+never changed by an update.
+
+## Before you update
+
+- **Node.js 20 or later**, as for 1.1.0. Nothing else is installed. Putting
+  the dashboard online also downloads the official Vercel command-line tool
+  through `npx` (part of Node.js), and only after you say yes.
+- **Updating from 1.1.0.** Your 1.1.0 updater installs 1.2.0 as usual
+  (preview, prepare, approve, apply). If your dashboard is running, stop it
+  and start it again afterwards so it uses the new version.
+- **Updating from 1.0.x.** Your 1.0.x updater can install 1.2.0 directly; you
+  do not need 1.1.0 first. What the 1.1.0 notes below say for 1.0.x still
+  applies: the 1.0.x preview of this update is cut off when an assistant
+  reads it through a pipe, so save it to a file outside your Home Base first
+  (`node system/update.mjs preview --candidate <new-release> > <outside>/preview.json`)
+  or preview with the new release's updater
+  (`node <new-release>/system/update.mjs preview --root <your Home Base> --candidate <new-release>`).
+  Right after the update, your assistant asks before running
+  `node system/update.mjs init` once, which deletes the old updater's
+  leftover staging copy. If an update is stuck under 1.0.x, the repair in
+  “Repair for an update stuck under 1.0.x” below works the same with the
+  1.2.0 release.
+
+## What is new
+
+- **Make the dashboard yours.** Ask your assistant to restyle your dashboard
+  in your own words, with or without a screenshot, or start from a preset
+  (`precise`, `soft`, `night`, `calm`). Your look lives in
+  `instance/dashboard/` (`theme.json`, and `theme.css` if you want more),
+  which updates never touch. Colours that would be hard to read keep the
+  default, and a theme the dashboard cannot use is skipped with a note at the
+  bottom of the page. A look is made from colours, fonts already on your
+  computer, and shapes; pictures and font files cannot be added, because the
+  page loads nothing it was not built with. If you do nothing, the dashboard
+  looks exactly as it did in 1.1.0. See “Make it yours” in
+  [the dashboard guide](./system/dashboard/README.md).
+- **Your dashboard on your phone (optional).** Say “put my dashboard online”
+  and your assistant walks you through putting a copy of the dashboard's own
+  view on your own free Vercel account, locked so only you can open it after
+  signing in with Vercel. It is never public. You create the account and
+  sign in yourself; your assistant never sees a Vercel password or token.
+  Your assistant first asks which Vercel account or team to use and uses
+  only the one you name, so a work team (whose members could open it) is
+  never picked by accident. A harmless placeholder goes up first. Your copy
+  is built only after `node system/dashboard/publish.mjs --check-locked`
+  confirms that Vercel asks for a sign-in on every address; the tool itself
+  refuses to build it without a passing check from the last 30 minutes.
+  What goes online is the page, your theme, your private dashboard modules
+  (their code and any data in their files), and the names and counts the
+  dashboard already shows, never the Home Base folder. Every file is
+  listed before upload, and links or anything that looks like a password,
+  key, email address, phone or card number, or a folder path from your
+  computer are refused. Say “update my online dashboard” after changes (it
+  asks you first each time), or ask Home Base to update it automatically at
+  the end of any session where Home Base changed. An automatic update checks
+  the lock before and after, and stops to ask when a new file or module would
+  go online. Say “take it down” to delete it. See
+  [Put the dashboard online](./system/workflows/put-the-dashboard-online.md).
+- **Two new skills**, `style-home-base-dashboard` and
+  `publish-home-base-dashboard`, so the release now has 42 repository Skills
+  (15 Home Base core).
+
+## For maintainers
+
+- `node system/dashboard/test-publish.mjs` joins the proof commands and the
+  Node 20 CI job. `smoke-browser.mjs` also renders a published copy and the
+  `soft` preset in Chrome.
+- `system/test-transition.mjs` now also installs 1.2.0 over a personalized
+  1.1.0 (from tag `v1.1.0`) that holds a dashboard theme in `instance/`.
+
+The notes for 1.1.0 follow exactly as they were released.
+
 # Home Base 1.1.0
 
 Version `1.1.0` is the current public stable Home Base release. It adds a
@@ -192,6 +270,7 @@ node system/test-privacy-scan.mjs
 node system/inspect-runtime.mjs
 node system/dashboard/build.mjs --check
 node system/dashboard/test-dashboard.mjs
+node system/dashboard/test-publish.mjs
 ```
 
 Maintainers also run these from a development checkout with full Git history
@@ -203,15 +282,15 @@ node system/test-transition.mjs
 node system/dashboard/smoke-browser.mjs
 ```
 
-After tagging the exact clean Home Base source commit `v1.1.0`, create and
+After tagging the exact clean Home Base source commit `v1.2.0`, create and
 re-extract the public archive with adjacent checksum and metadata receipts:
 
 ```bash
-node system/package.mjs --public-release --output /tmp/home-base-1.1.0.tgz
+node system/package.mjs --public-release --output /tmp/home-base-1.2.0.tgz
 ```
 
 The command refuses an uncommitted Home Base tree. Upload the archive and its
-`.sha256` and `.json` receipts to the `v1.1.0` GitHub release; the stable
+`.sha256` and `.json` receipts to the `v1.2.0` GitHub release; the stable
 channel already points to that metadata.
 
 ## Durable safety boundary

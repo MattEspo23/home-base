@@ -103,8 +103,8 @@ export function validateSkillVaultProjection(homeBaseRoot) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort())
-  if (adapterNames[0].length !== 40 || JSON.stringify(adapterNames[0]) !== JSON.stringify(adapterNames[1])) {
-    throw new Error('Home Base must expose the same 40 Skills to Codex and Claude')
+  if (adapterNames[0].length !== 42 || JSON.stringify(adapterNames[0]) !== JSON.stringify(adapterNames[1])) {
+    throw new Error('Home Base must expose the same 42 Skills to Codex and Claude')
   }
   for (const name of adapterNames[0]) {
     const observed = metadata(path.join(homeBaseRoot, '.agents', 'skills', name))

@@ -40,10 +40,11 @@ The maintained Home Base instructions live in `system/`. Most people never need 
 
 ## Included Skill Vault
 
-The release contains 40 editable repository Skills out of the box:
+The release contains 42 editable repository Skills out of the box:
 
-- 13 Home Base core workflows for setup, discovery, system design, Build Mode,
-  capability review, updates, and learning; and
+- 15 Home Base core workflows for setup, discovery, system design, Build Mode,
+  capability review, updates, dashboard styling, putting the dashboard
+  online, and learning; and
 - 27 packages pinned from the public
   [EspoAI Skill Vault](https://github.com/MattEspo23/skills) `v0.1.3` release
   at commit `cf0df42008cdffa79556a35ef79b803d3b2f19d7`.
@@ -119,7 +120,7 @@ preview/prepare/approve/apply/recover/rollback process is documented in
 [system/UPDATE-GUIDE.md](system/UPDATE-GUIDE.md). Replacing the whole folder is
 not a safe update method.
 
-The official `v1.1.0` GitHub release provides the current immutable Home Base archive,
+The official `v1.2.0` GitHub release provides the current immutable Home Base archive,
 adjacent SHA-256 receipt, and machine-readable release metadata. Use those
 release assets rather than downloading a mutable branch snapshot.
 

@@ -16,12 +16,21 @@
 //   no key. Other refused requests keep their 421, 403, or 401 status.
 // - Static files are an exact in-memory allowlist built from dist/ at startup.
 // - Instance modules are served only for ids declared in modules.json.
+// - The user's theme is two same-origin stylesheets: tokens generated from a
+//   checked instance/dashboard/theme.json, and their own theme.css. The page
+//   links each one only while it applies, and the CSP stays style-src 'self'.
 // - Errors return a short generic message, never a stack trace.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { readInside, readInstanceModules, readStatus, resolveInstanceModuleFile } from './status.mjs'
+import { readCustomCss, readTheme } from './theme.mjs'
+
+// Where the page's theme stylesheets go, after the base stylesheet.
+export const THEME_SLOT = '<!-- home-base-theme -->'
+export const TOKENS_LINK = '<link rel="stylesheet" href="/instance-theme/tokens.css" />'
+export const CUSTOM_LINK = '<link rel="stylesheet" href="/instance-theme/theme.css" />'
 
 const MIME = {
   '.js': 'text/javascript; charset=utf-8',
@@ -84,8 +93,8 @@ function loadDist(distDir, launchNonce, dbName) {
     files.set(`/app/${entry.name}`, { body: fs.readFileSync(path.join(distDir, entry.name)), type: MIME[path.extname(entry.name)] })
   }
   const page = fs.readFileSync(path.join(distDir, 'index.html'), 'utf8')
-  if (!page.includes('__HOME_BASE_LAUNCH__') || !page.includes('__HOME_BASE_DB__')) throw new Error('dist/index.html is missing its launch placeholders')
-  const html = Buffer.from(page.replace('__HOME_BASE_LAUNCH__', launchNonce).replace('__HOME_BASE_DB__', dbName))
+  if (!page.includes('__HOME_BASE_LAUNCH__') || !page.includes('__HOME_BASE_DB__') || !page.includes(THEME_SLOT)) throw new Error('dist/index.html is missing its launch placeholders')
+  const html = page.replace('__HOME_BASE_LAUNCH__', launchNonce).replace('__HOME_BASE_DB__', dbName)
   return { files, html }
 }
 
@@ -163,6 +172,14 @@ export function createDashboardServer({ root, port, dbName, distDir, key }) {
   const cookieDigest = digest(Buffer.from(cookieValueFor(key), 'latin1'))
   const instanceTag = instanceTagFor(key)
   const { files, html } = loadDist(distDir, launchNonce, dbName)
+  // The theme is read again on every page load, so a change shows on reload.
+  // A theme that cannot be read never stops the page: it gets the default look.
+  const pageFor = () => {
+    let theme = { tokens: null, customCss: false }
+    try { theme = readTheme(root) } catch {}
+    const links = [theme.tokens ? TOKENS_LINK : '', theme.customCss ? CUSTOM_LINK : ''].filter(Boolean).join('\n    ')
+    return Buffer.from(html.replace(THEME_SLOT, links))
+  }
   const help = { right: helpPage(port, { wrongHost: false }), wrong: helpPage(port, { wrongHost: true }) }
 
   function send(response, status, body, type = 'text/plain; charset=utf-8', extra = {}) {
@@ -232,16 +249,31 @@ export function createDashboardServer({ root, port, dbName, distDir, key }) {
       return send(response, 403, site === undefined && pathname.startsWith('/api/') ? REASONS.noFetchMetadata : REASONS.noSession)
     }
 
-    if (pathname === '/') return send(response, 200, html, MIME['.html'])
+    if (pathname === '/') return send(response, 200, pageFor(), MIME['.html'])
     const file = files.get(pathname)
     if (file) return send(response, 200, file.body, file.type)
 
-    if (pathname === '/api/status' || pathname === '/api/modules') {
+    if (pathname === '/api/status' || pathname === '/api/modules' || pathname === '/api/theme') {
       if (site === undefined) return send(response, 403, REASONS.noFetchMetadata)
       if (site !== 'same-origin') return send(response, 403, 'Forbidden')
       if (!matches(request.headers['x-home-base-token'], nonceDigest)) return send(response, 401, REASONS.staleNonce)
-      const body = pathname === '/api/status' ? readStatus(root) : { modules: readInstanceModules(root) }
+      let body
+      if (pathname === '/api/status') body = readStatus(root)
+      else if (pathname === '/api/modules') body = { modules: readInstanceModules(root) }
+      else {
+        const { state, name, notes, customCss } = readTheme(root)
+        body = { schemaVersion: 1, state, name, notes, customCss }
+      }
       return send(response, 200, JSON.stringify(body), MIME['.json'])
+    }
+
+    // Theme stylesheets: only from instance/dashboard/, only same-origin,
+    // and 404 when there is nothing to apply.
+    if (pathname === '/instance-theme/tokens.css' || pathname === '/instance-theme/theme.css') {
+      if (site !== 'same-origin') return send(response, 403, site === undefined ? REASONS.noFetchMetadata : 'Forbidden')
+      const css = pathname === '/instance-theme/tokens.css' ? readTheme(root).tokens : readCustomCss(root)
+      if (css) return send(response, 200, css, MIME['.css'])
+      return send(response, 404, 'Not found')
     }
 
     const moduleMatch = pathname.match(/^\/instance-modules\/([a-z0-9-]{1,40})\/([A-Za-z0-9._/-]{1,160})$/)

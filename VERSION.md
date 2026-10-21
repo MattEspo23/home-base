@@ -1,8 +1,8 @@
 # Home Base version
 
-- Version: `1.1.0`
+- Version: `1.2.0`
 - Status: public stable release
-- Updated: 2026-10-15
+- Updated: 2026-10-21
 
 ## Version-one support
 
@@ -21,7 +21,7 @@
 - Visible suggestion budgeting, durable decline, and two-run learning proof
 - Conversation-first SOP discovery, skill building, safe connection planning,
   update review, and learning closeout
-- A pinned 40-Skill bundle (13 Home Base core + 27 released Skill Vault 0.1.3 packages)
+- A pinned 42-Skill bundle (15 Home Base core + 27 released Skill Vault 0.1.3 packages)
   with matching Codex and Claude adapters, file hashes, and exact provenance
 - Root MIT licensing, byte-verbatim third-party notices, protected brand/identity
   boundaries, latest-stable best-effort support, and private security routing
@@ -47,11 +47,21 @@
   privacy scan
 - Node.js 20 or later for everything a user runs
 
+## Added in 1.2.0
+
+- Dashboard themes: ask your assistant to restyle the local dashboard, or
+  start from a preset (`precise`, `soft`, `night`, `calm`); your theme lives
+  in `instance/dashboard/` and hard-to-read colours keep the default
+- An optional locked online copy of the dashboard on your own Vercel account
+  (`node system/dashboard/publish.mjs`): a harmless placeholder goes up first,
+  and your copy is built only after `--check-locked` confirms that Vercel asks
+  for a sign-in on every address
+
 ## Release boundary
 
-The official `v1.1.0` GitHub release is the current immutable distribution
-source. The `v1.0.0` and `v1.0.1` tags and releases remain unchanged as
-history.
+The official `v1.2.0` GitHub release is the current immutable distribution
+source. The `v1.0.0`, `v1.0.1`, and `v1.1.0` tags and releases remain
+unchanged as history.
 Skills and local workflows never grant account access or permission for an
 external action. Connections, sends, publishing, spending, deployment, and
 future updates still require their own explicit review and approval.

@@ -2,7 +2,7 @@
 
 Home Base ships with two Skill layers:
 
-- 13 Home Base core Skills, maintained in this repository; and
+- 15 Home Base core Skills, maintained in this repository; and
 - 27 Skill Vault packages projected from the exact reviewed source identity
   recorded in `skill-vault.lock.json`.
 

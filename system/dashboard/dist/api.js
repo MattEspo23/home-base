@@ -12,6 +12,13 @@ function meta(name        )         {
 const launchNonce         = meta('home-base-token')
 export const dbName         = meta('home-base-db')
 
+// The online copy (system/dashboard/publish.mjs) is the same page in static
+// mode: it has no key, cookie, or nonce of its own and reads plain JSON files
+// written next to it when it was published. The host's own sign-in protects
+// every file, and the browser sends that sign-in with same-origin requests.
+export const isStatic          = meta('home-base-mode') === 'static'
+export const publishedAt         = meta('home-base-published')
+
 // Why a request failed, in terms the page can explain.
 
 
@@ -27,7 +34,7 @@ async function getJson   (path        )             {
   let response
   try {
     response = await fetch(path, {
-      headers: { 'x-home-base-token': launchNonce },
+      headers: isStatic ? {} : { 'x-home-base-token': launchNonce },
       credentials: 'same-origin',
       cache: 'no-store',
       redirect: 'error',
@@ -43,5 +50,6 @@ async function getJson   (path        )             {
   return (await response.json())
 }
 
-export const getStatus = ()                          => getJson                ('/api/status')
-export const getModules = ()                                         => getJson                               ('/api/modules')
+export const getStatus = ()                          => getJson                (isStatic ? '/status.json' : '/api/status')
+export const getModules = ()                                         => getJson                               (isStatic ? '/modules.json' : '/api/modules')
+export const getTheme = ()                       => getJson             (isStatic ? '/theme-status.json' : '/api/theme')

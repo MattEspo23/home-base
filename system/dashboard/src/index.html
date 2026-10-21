@@ -7,8 +7,10 @@
     <meta name="referrer" content="no-referrer" />
     <meta name="home-base-token" content="__HOME_BASE_LAUNCH__" />
     <meta name="home-base-db" content="__HOME_BASE_DB__" />
+    <meta name="home-base-mode" content="local" />
     <title>Home Base</title>
     <link rel="stylesheet" href="/app/styles.css" />
+    <!-- home-base-theme -->
     <script type="module" src="/app/main.js"></script>
   </head>
   <body>
@@ -16,7 +18,7 @@
     <header class="masthead">
       <div class="wrap masthead-row">
         <h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Home Base</h1>
-        <p class="where"><span class="where-dot" aria-hidden="true"></span>On this computer only</p>
+        <p class="where"><span class="where-dot" aria-hidden="true"></span><span id="where-text">On this computer only</span></p>
       </div>
     </header>
     <main id="main" class="wrap" tabindex="-1">
@@ -50,6 +52,7 @@
     </main>
     <footer class="wrap foot">
       <p class="foot-note" id="foot-note">Reads a few names from your Home Base folder. It only writes its own settings file.</p>
+      <p class="foot-theme" id="foot-theme" role="status" hidden></p>
     </footer>
   </body>
 </html>

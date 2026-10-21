@@ -83,7 +83,7 @@ function assertOnlyAllowlisted(context) {
 // ------------------------------------------------------------ fixtures
 
 const tempRoots = []
-function fixtureHomeBase({ agentsMd = true, claudeMd = '@AGENTS.md\n', agentsSkills = 40, claudeSkills = 40 } = {}) {
+function fixtureHomeBase({ agentsMd = true, claudeMd = '@AGENTS.md\n', agentsSkills = 42, claudeSkills = 42 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'home-base-doctor-'))
   tempRoots.push(root)
   fs.mkdirSync(path.join(root, 'system'), { recursive: true })
@@ -91,7 +91,7 @@ function fixtureHomeBase({ agentsMd = true, claudeMd = '@AGENTS.md\n', agentsSki
   if (agentsMd) fs.writeFileSync(path.join(root, 'AGENTS.md'), '# Fixture instructions\n')
   if (claudeMd !== null) fs.writeFileSync(path.join(root, 'CLAUDE.md'), claudeMd)
   const names = ['start-home-base', 'review-home-base-update', 'ask-espo', 'youtube-action-plan']
-  while (names.length < 40) names.push(`fixture-skill-${names.length}`)
+  while (names.length < 42) names.push(`fixture-skill-${names.length}`)
   for (const [folder, count] of [['.agents', agentsSkills], ['.claude', claudeSkills]]) {
     for (const name of names.slice(0, count)) {
       fs.mkdirSync(path.join(root, folder, 'skills', name), { recursive: true })

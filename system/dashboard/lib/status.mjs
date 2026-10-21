@@ -88,6 +88,17 @@ function existsAs(realRoot, relative, kind) {
   }
 }
 
+// True when something exists at the path, without following a link at the
+// end. Used only to explain why a file that is there was not used.
+export function pathPresent(realRoot, relative) {
+  try {
+    fs.lstatSync(path.join(realRoot, ...relative.split('/')))
+    return true
+  } catch {
+    return false
+  }
+}
+
 // --------------------------------------------------------------- parsing
 
 // A one-line YAML value: surrounding spaces, one pair of matching quotes, and

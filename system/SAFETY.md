@@ -23,6 +23,26 @@ on `127.0.0.1`. Hand the user that printed address once in chat. If they ask,
 you may open that exact address in a browser on this computer, including when
 they paste it back. Never write it into any file, memory, note, or index.
 
+## Putting Home Base online
+
+Never upload Home Base content to any host unless the project is first
+verified locked to the owner’s own login, and never make it public. The only
+supported way is `system/workflows/put-the-dashboard-online.md`: a harmless
+placeholder goes up first, and the real copy only after
+`node system/dashboard/publish.mjs --check-locked` passes.
+
+One exception to asking at the moment of action: if the user explicitly asks
+for automatic updates of their online dashboard, and that standing yes is
+recorded in `you/PREFERENCES.md` (their words, the date, the project, and the
+Vercel team or account), you may re-publish the dashboard’s own copy to that
+same, already-locked project at the end of a session without asking again.
+Only through `node system/dashboard/publish.mjs --out <folder> --auto`, only
+after `--check-locked` passes first, and with the lock checked again
+afterwards. If `--auto` refuses, upload nothing and ask; if a lock check
+fails, the only upload is the placeholder going back, and then ask. It never
+covers a first upload, a new file or module, another project, team, or
+account, or a change to the lock. The user can withdraw it at any time.
+
 ## Ask at the moment of action
 
 Require explicit confirmation before:
@@ -41,6 +61,8 @@ Require explicit confirmation before:
 - sharing private information with another person or service.
 
 Earlier general enthusiasm does not replace confirmation at the consequential step.
+The one standing approval is the recorded online-dashboard exception in
+“Putting Home Base online” above.
 
 ## Build Mode preview
 

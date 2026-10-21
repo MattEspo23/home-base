@@ -12,32 +12,26 @@
 // through import(); the cookie is HttpOnly and SameSite=Strict; localhost and
 // a browser without the cookie get the help page with no data; no request
 // leaves 127.0.0.1; nothing scrolls sideways at 375 px; a link from another
-// site that carries the key still signs in.
+// site that carries the key still signs in; a theme applies through
+// same-origin stylesheets and an invalid one is explained in the footer.
+// Then the online copy: publish.mjs writes the placeholder and the snapshot of
+// the same fixture, a tiny local server serves that folder the way Vercel
+// would (only the listed files, with the vercel.json headers), and the page
+// renders from status.json in static mode under the same policy.
 import assert from 'node:assert/strict'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
-import net from 'node:net'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { findBrowser, freePort, openBrowser, startDashboard } from './lib/chrome.mjs'
+import { recordLockCheck } from './lib/online.mjs'
 
 const dashboardDir = path.dirname(fileURLToPath(import.meta.url))
 
-function findBrowser() {
-  const candidates = [
-    process.env.CHROME_PATH,
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
-  ]
-  for (const name of ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']) {
-    const found = spawnSync('which', [name], { encoding: 'utf8' })
-    if (found.status === 0) candidates.push(found.stdout.trim())
-  }
-  return candidates.find((candidate) => candidate && fs.existsSync(candidate))
-}
-
 const browserPath = findBrowser()
-if (!browserPath || typeof WebSocket !== 'function') {
+if (!browserPath) {
   console.log('Skipped: no Chrome or Chromium found (set CHROME_PATH), or this Node has no built-in WebSocket.')
   process.exit(0)
 }
@@ -56,79 +50,35 @@ write('capabilities/INDEX.md', '## Available and verified\n\n- [Codex opens Home
 write('instance/dashboard/modules.json', JSON.stringify({ modules: [{ id: 'smoke', title: 'Smoke module', entry: 'index.js' }] }))
 write('instance/dashboard/modules/smoke/index.js', 'export function mount(element) { const p = document.createElement("p"); p.textContent = "Smoke module mounted"; element.append(p) }\n')
 
-const freePort = () => new Promise((resolve) => {
-  const probe = net.createServer().listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)) })
-})
-
 const cleanups = []
+
+// Serves a published folder the way Vercel would: only the files its
+// manifest lists, each with the headers from its vercel.json.
+async function serveSnapshot(folder) {
+  const port = await freePort()
+  const listed = new Set(JSON.parse(fs.readFileSync(path.join(folder, 'ONLINE-MANIFEST.json'), 'utf8')).files.map((item) => item.path))
+  const headers = Object.fromEntries(JSON.parse(fs.readFileSync(path.join(folder, 'vercel.json'), 'utf8')).headers[0].headers.map((item) => [item.key, item.value]))
+  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' }
+  const server = http.createServer((request, response) => {
+    const name = new URL(request.url, 'http://127.0.0.1').pathname.slice(1) || 'index.html'
+    if (request.method !== 'GET' || !listed.has(name) || name === 'vercel.json') {
+      response.writeHead(404, headers)
+      response.end()
+      return
+    }
+    response.writeHead(200, { ...headers, 'content-type': types[path.extname(name)] })
+    response.end(fs.readFileSync(path.join(folder, ...name.split('/'))))
+  })
+  await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve))
+  cleanups.push(() => server.close())
+  return `http://127.0.0.1:${port}`
+}
+
 async function main() {
-  let port = await freePort()
-  while (port < 1024 || [4173, 5173, 3000, 5000, 8000, 8080, 8888].includes(port)) port = await freePort()
-  const server = spawn(process.execPath, [path.join(dashboardDir, 'serve.mjs'), '--home-base', home, '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
-  cleanups.push(() => server.kill())
-  const launch = await new Promise((resolve, reject) => {
-    let output = ''
-    server.stdout.on('data', (chunk) => { output += chunk; if (output.includes('Press Ctrl+C')) resolve(output) })
-    server.on('exit', (code) => reject(new Error(`dashboard exited ${code}: ${output}`)))
-  })
-  const key = launch.match(/#key=([A-Za-z0-9_-]{43})/)[1]
+  const port = await freePort()
+  const key = await startDashboard(dashboardDir, home, port, cleanups)
   const origin = `http://127.0.0.1:${port}`
-
-  const profile = path.join(scratch, 'profile')
-  const browser = spawn(browserPath, [
-    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run',
-    '--no-default-browser-check', '--disable-extensions', '--disable-background-networking', '--disable-sync',
-    '--disable-component-update', '--metrics-recording-only', 'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'] })
-  cleanups.push(() => browser.kill())
-  const endpoint = await new Promise((resolve, reject) => {
-    let output = ''
-    browser.stderr.on('data', (chunk) => { output += chunk; const match = output.match(/DevTools listening on (ws:\/\/\S+)/); if (match) resolve(match[1]) })
-    browser.on('exit', (code) => reject(new Error(`browser exited ${code}`)))
-    setTimeout(() => reject(new Error('browser did not start')), 15000).unref()
-  })
-
-  const socket = new WebSocket(endpoint)
-  await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject })
-  cleanups.push(() => socket.close())
-  let nextId = 1
-  const pending = new Map()
-  const events = []
-  socket.onmessage = (message) => {
-    const data = JSON.parse(message.data)
-    if (data.id && pending.has(data.id)) {
-      const { resolve, reject } = pending.get(data.id)
-      pending.delete(data.id)
-      if (data.error) reject(new Error(data.error.message))
-      else resolve(data.result)
-    } else if (data.method) {
-      events.push(data)
-    }
-  }
-  const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-    const id = nextId++
-    pending.set(id, { resolve, reject })
-    socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }))
-  })
-
-  const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
-  const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
-  const page = (method, params) => send(method, params, sessionId)
-  await page('Runtime.enable')
-  await page('Log.enable')
-  await page('Network.enable')
-  await page('Page.enable')
-  const evaluate = async (expression) => (await page('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result.value
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-  async function open(url, ready) {
-    await page('Page.navigate', { url })
-    for (let waited = 0; waited < 10000; waited += 100) {
-      await sleep(100)
-      if (await evaluate(ready).catch(() => false)) return
-    }
-    throw new Error(`Timed out waiting on ${url}: ${await evaluate('document.body ? document.body.innerText.slice(0, 300) : ""')}`)
-  }
-  const text = () => evaluate('document.body.innerText')
+  const { page, evaluate, open, text, sleep, events } = await openBrowser(browserPath, path.join(scratch, 'profile'), cleanups)
 
   // 1. The printed address signs in and opens the dashboard.
   await open(`${origin}/#key=${key}`, `document.querySelector('#home-body .next') !== null && document.body.innerText.includes('Smoke module mounted')`)
@@ -156,6 +106,30 @@ async function main() {
   assert.ok(await evaluate('document.documentElement.scrollWidth <= 375'), 'no horizontal scroll at 375 px')
   await page('Emulation.clearDeviceMetricsOverride')
 
+  // 3b. A theme applies on reload as same-origin stylesheets, under the same
+  //     CSP; theme.css loads after it; an invalid theme is explained in the
+  //     footer and the default look stays.
+  const defaultBackground = await evaluate('getComputedStyle(document.body).backgroundColor')
+  assert.equal(await evaluate("document.querySelectorAll('link[href^=\"/instance-theme/\"]').length"), 0, 'no theme links without a theme')
+  write('instance/dashboard/theme.json', fs.readFileSync(path.join(dashboardDir, 'themes', 'soft.json')))
+  write('instance/dashboard/theme.css', '.brand { letter-spacing: 0.3em; }\n')
+  await page('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })
+  await open(`${origin}/`, `!document.getElementById('foot-theme').hidden`)
+  assert.equal(await evaluate("getComputedStyle(document.body).backgroundColor"), 'rgb(247, 243, 238)', 'soft background applied')
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.domain')).borderTopLeftRadius"), '16px', 'large radius applied')
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.brand')).letterSpacing"), `${0.3 * 15}px`, 'theme.css applied after the tokens')
+  assert.equal(await evaluate("document.getElementById('foot-theme').textContent"), 'Theme: Soft. Your theme.css is applied.')
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('link[rel=stylesheet]')].map((link) => new URL(link.href).pathname)"), ['/app/styles.css', '/instance-theme/tokens.css', '/instance-theme/theme.css'])
+  fs.rmSync(path.join(home, 'instance/dashboard/theme.css'))
+  write('instance/dashboard/theme.json', JSON.stringify({ schemaVersion: 1, colors: { light: { accent: 'blue' } } }))
+  await open(`${origin}/`, `!document.getElementById('foot-theme').hidden`)
+  const note = await evaluate("document.getElementById('foot-theme').textContent")
+  assert.ok(note.startsWith('Theme not applied: colors.light.accent “blue” is not a colour like #1d4ed8'), note)
+  assert.equal(await evaluate("getComputedStyle(document.body).backgroundColor"), defaultBackground, 'the default look stays')
+  assert.equal(await evaluate("document.querySelectorAll('link[href^=\"/instance-theme/\"]').length"), 0, 'no theme links for an invalid theme')
+  fs.rmSync(path.join(home, 'instance/dashboard/theme.json'))
+  await page('Emulation.setEmulatedMedia', { features: [] })
+
   // 4. localhost gets the help page, with no data.
   await open(`http://localhost:${port}/`, `document.body.innerText.includes('Open your Home Base dashboard')`)
   const helpText = await text()
@@ -180,6 +154,38 @@ async function main() {
   // 6. A wrong key is explained, not accepted.
   await open(`${origin}/#key=${'A'.repeat(43)}`, `document.getElementById('status').textContent.includes('does not match')`)
 
+  // 6b. The online copy renders from status.json under the same policy, with
+  //     the theme and the module, and holds no key and no file bodies.
+  write('instance/dashboard/theme.json', fs.readFileSync(path.join(dashboardDir, 'themes', 'soft.json')))
+  const onlineDir = path.join(scratch, 'online', 'home-base-dashboard')
+  const publish = (args) => spawnSync(process.execPath, [path.join(dashboardDir, 'publish.mjs'), '--home-base', home, ...args], { encoding: 'utf8' })
+  const placed = publish(['--placeholder', '--out', onlineDir])
+  assert.equal(placed.status, 0, placed.stderr)
+  // Stand-ins for the placeholder upload (the Vercel CLI's link file) and a
+  // passing lock check; nothing here contacts Vercel.
+  fs.mkdirSync(path.join(onlineDir, '.vercel'))
+  fs.writeFileSync(path.join(onlineDir, '.vercel', 'project.json'), '{}\n')
+  recordLockCheck(onlineDir, fs.realpathSync(home), ['https://fixture.vercel.app'])
+  const copied = publish(['--out', onlineDir])
+  assert.equal(copied.status, 0, copied.stderr)
+  fs.rmSync(path.join(home, 'instance/dashboard/theme.json'))
+  const staticOrigin = await serveSnapshot(onlineDir)
+  await page('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })
+  await open(`${staticOrigin}/`, `document.querySelector('#home-body .next') !== null && document.body.innerText.includes('Smoke module mounted')`)
+  const onlineText = await text()
+  for (const expected of ['Your Home Base', 'Lake trip', 'Codex', 'Verified', '1 more entry not shown', 'Smoke module mounted', 'A copy of your Home Base from']) {
+    assert.ok(onlineText.toLowerCase().includes(expected.toLowerCase()), `${expected} online in: ${onlineText.slice(0, 400)}`)
+  }
+  assert.equal(await evaluate("document.getElementById('where-text').textContent"), 'Online, locked to your Vercel sign-in')
+  assert.ok(!onlineText.includes(PRIVATE) && !onlineText.includes(key), 'no file bodies and no key online')
+  assert.equal(await evaluate("getComputedStyle(document.body).backgroundColor"), 'rgb(247, 243, 238)', 'the theme goes online too')
+  assert.equal(await evaluate("document.getElementById('foot-theme').textContent"), 'Theme: Soft.')
+  await page('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true })
+  await open(`${staticOrigin}/`, `document.querySelector('#home-body .next') !== null`)
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= 375'), 'no horizontal scroll at 375 px online')
+  await page('Emulation.clearDeviceMetricsOverride')
+  await page('Emulation.setEmulatedMedia', { features: [] })
+
   // 7. No console errors (CSP or Trusted Types violations surface here), and
   //    no request left 127.0.0.1 or localhost on this port.
   const problems = events.filter((event) =>
@@ -188,7 +194,7 @@ async function main() {
     (event.method === 'Runtime.consoleAPICalled' && event.params.type === 'error'))
   assert.deepEqual(problems.map((event) => JSON.stringify(event.params).slice(0, 200)), [])
   const requested = events.filter((event) => event.method === 'Network.requestWillBeSent').map((event) => event.params.request.url)
-  const outside = requested.filter((url) => !url.startsWith(`${origin}/`) && !url.startsWith(`http://localhost:${port}/`) && url !== 'about:blank')
+  const outside = requested.filter((url) => !url.startsWith(`${origin}/`) && !url.startsWith(`http://localhost:${port}/`) && !url.startsWith(`${staticOrigin}/`) && url !== 'about:blank')
   assert.deepEqual(outside, [], 'no outside requests')
   console.log(`Browser smoke test passed (${path.basename(browserPath)}, ${requested.length} requests, all local).`)
 }

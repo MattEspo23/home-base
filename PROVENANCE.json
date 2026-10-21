@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": {
     "name": "EspoAI Home Base",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "copyrightHolder": "Matthew Esposito",
     "license": "MIT"
   },
@@ -22,9 +22,11 @@
     "improve-home-base-system",
     "inspect-home-base-capabilities",
     "plan-home-base-tool",
+    "publish-home-base-dashboard",
     "review-home-base-interface",
     "review-home-base-update",
-    "start-home-base"
+    "start-home-base",
+    "style-home-base-dashboard"
   ],
   "skillVault": {
     "state": "released",

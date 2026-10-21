@@ -93,6 +93,9 @@ Home Base folder. Exit codes: 0 already running (address printed again),
 - Whether `AGENTS.md`, `CLAUDE.md`, `.agents/skills`, and `.claude/skills`
   exist, and how many repository skills they hold.
 
+- `instance/dashboard/theme.json` and `theme.css`, if present (see “Make it
+  yours”).
+
 It never returns file bodies or unlinked text, and it never reads through a
 symbolic or hard link or outside the Home Base folder.
 
@@ -122,6 +125,74 @@ symbolic or hard link or outside the Home Base folder.
 - Browsers: current Chrome, Edge, Firefox, and Safari 16.4 or later. Older
   Safari does not send the request details the server checks, and the page
   says so.
+
+## Make it yours
+
+The dashboard ships with one plain look. Make yours look and work however you
+like: open your assistant in your Home Base folder and say so in your own
+words, with or without a screenshot. For example, “redesign my Home Base in
+this style,” “calmer and rounder,” “use my brand colours,” or “add a card for
+my reading list.” It confirms once, makes the change, and shows you a picture.
+“Put it back” undoes it.
+
+Your look lives in `instance/dashboard/`, which updates never touch. The
+assistant uses the lightest place that does the job:
+
+- `theme.json` for colours, fonts, corners, spacing, and light or dark;
+- `theme.css`, your own stylesheet, for anything else visual;
+- a private module (below) for new cards or pieces;
+- the dashboard’s own code in `system/dashboard/` only when nothing else can
+  do it. Updates keep that change too and ask how to combine it with theirs.
+
+Presets to start from, in `system/dashboard/themes/`: `precise` (the default),
+`soft` (warm and rounded), `night` (always dark), and `calm` (light, soft
+greys, roomy). To save credits, the assistant changes small files, starts from
+a preset when one is close, and rebuilds nothing unless the app itself changes.
+
+Quiet safety nets:
+
+- Text that would be hard to read keeps the default colour, and the footer
+  says which. If you change the background, choose the success, warning, and
+  danger colours too: when a default one is hard to read on your background,
+  the default background comes back.
+- A `theme.json` the dashboard cannot use is skipped, and the footer says why.
+- The page loads nothing from the internet because it shows private things,
+  so it uses fonts already on your computer. Pictures (a logo or a photo) and
+  font files cannot be used: the page blocks them, so a look is made from
+  colours, installed fonts, and shapes.
+
+### theme.json settings
+
+- `schemaVersion`: `1`. `name`: shown in the footer.
+- `colors`: for `light` and `dark`, any of `background`, `surface` (cards),
+  `text`, `mutedText`, `accent`, `accentText`, `border`, `success`, `warning`,
+  and `danger`, as hex like `#1d4ed8`.
+- `font`: `system` (the default), `plain`, `rounded`, `serif`, `mono`, or
+  `humanist`.
+- `radius`: `none`, `small`, `medium`, or `large`. `density`: `compact`,
+  `comfortable`, or `airy`. `shadow`: `none` or `soft`. `mode`: `auto`,
+  `light`, or `dark`.
+
+The file is read on every page load, so a change shows when you reload. Like
+other instance files, a link, a folder, or a file over 16 KB is not used.
+`theme.css` loads last and can change any token from `src/styles.css` (for
+example `:root { --text-headline: 26px; }`) or any rule; it is your own code,
+like a module.
+
+To check a theme without opening your dashboard, run
+`node system/dashboard/preview-theme.mjs` (or add `--preset calm` or
+`--theme <file>`). It prints any problem and, when Chrome or Chromium is
+installed, saves pictures of a fictional sample Home Base.
+
+## Ways to open your dashboard
+
+- **On this computer:** see “Start it” above. This is the default.
+- **Online, on your phone and computer:** optional. Say “put my dashboard
+  online.” Your assistant puts a copy of the dashboard’s own view (not your
+  folder) on your own free Vercel account, locked so only you can open it
+  after signing in with Vercel, and updates it when you ask (or, if you ask
+  for it, automatically at the end of a session). See
+  [Put the dashboard online](../workflows/put-the-dashboard-online.md).
 
 ## Private modules
 
@@ -153,7 +224,14 @@ fingerprints of every source and output in `dist/build-info.json`.
 Node version to rebuild with when the versions differ. CI uses that exact
 version.
 
-Tests: `node system/dashboard/test-dashboard.mjs`. Browser check:
+Every visual value in `src/styles.css` comes from the tokens at its top.
+`lib/theme.mjs` holds the theme rules and the default colours, which a test
+keeps equal to those tokens; `themes/precise.json` must stay the default look.
+
+Tests: `node system/dashboard/test-dashboard.mjs` and
+`node system/dashboard/test-publish.mjs` (the online copy and the lock check,
+against local fixtures only). Browser check:
 `node system/dashboard/smoke-browser.mjs` drives a local Chrome or Chromium,
 if one is installed, through the sign-in and the page on a temporary
-fixture; without one it says so and skips.
+fixture, then renders that fixture's online copy from a local folder server;
+without one it says so and skips.

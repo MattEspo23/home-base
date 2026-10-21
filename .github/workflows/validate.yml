@@ -86,3 +86,4 @@ jobs:
           node system/inspect-runtime.mjs
           node system/dashboard/build.mjs --check
           node system/dashboard/test-dashboard.mjs
+          node system/dashboard/test-publish.mjs

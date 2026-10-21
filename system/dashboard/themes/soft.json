@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "name": "Soft",
+  "description": "Warm paper colours, rounded type and corners, gentle shadows, more room.",
+  "font": "rounded",
+  "radius": "large",
+  "density": "airy",
+  "shadow": "soft",
+  "mode": "auto",
+  "colors": {
+    "light": {
+      "background": "#f7f3ee",
+      "surface": "#fffdfa",
+      "text": "#2b2521",
+      "mutedText": "#675d55",
+      "accent": "#a8481f",
+      "accentText": "#ffffff",
+      "border": "#e8dfd4",
+      "success": "#2d7048",
+      "warning": "#875600",
+      "danger": "#b0281d"
+    },
+    "dark": {
+      "background": "#1b1815",
+      "surface": "#24201c",
+      "text": "#f2ece4",
+      "mutedText": "#b5aa9d",
+      "accent": "#f0a27c",
+      "accentText": "#1b1815",
+      "border": "#3b342d",
+      "success": "#82c99c",
+      "warning": "#e8b65c",
+      "danger": "#f3978c"
+    }
+  }
+}

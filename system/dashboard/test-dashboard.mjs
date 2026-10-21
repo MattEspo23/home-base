@@ -16,6 +16,10 @@ import {
   BLOCKED_PORTS, IDENTITY_FILE, deriveIdentity, loadIdentity, newKey, parseAssistants, parseIndex, parseSetup,
   portAllowed, readInstanceModules, readStatus, resolveHomeBase,
 } from './lib/status.mjs'
+import {
+  COLOR_KEYS, CONTRAST_PAIRS, DEFAULT_COLORS, THEME_CSS_FILE, THEME_FILE, barColor, contrastRatio, readTheme,
+  resolvePalette, themeCss, validateTheme,
+} from './lib/theme.mjs'
 
 const dashboardDir = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.join(dashboardDir, 'dist')
@@ -524,6 +528,226 @@ test('refuses the protected ports and unknown arguments', async () => {
   }
   await assert.rejects(startServer(['--home-base', fixture, '--host', '0.0.0.0']), (error) => error.code === 2)
   await assert.rejects(startServer(['--home-base', path.join(scratch, 'missing')]), (error) => error.code === 2)
+})
+
+// ------------------------------------------------------------- themes
+
+const themesDir = path.join(dashboardDir, 'themes')
+const presetNames = () => fs.readdirSync(themesDir).filter((name) => name.endsWith('.json')).sort()
+const readPreset = (name) => JSON.parse(fs.readFileSync(path.join(themesDir, name), 'utf8'))
+const themeRoot = (name) => {
+  const root = path.join(scratch, `theme-${name}`)
+  fs.mkdirSync(path.join(root, 'instance', 'dashboard'), { recursive: true })
+  return fs.realpathSync.native(root)
+}
+
+test('the default colours in lib/theme.mjs are exactly the tokens in styles.css', () => {
+  const css = fs.readFileSync(path.join(distDir, 'styles.css'), 'utf8')
+  const tokens = (text) => Object.fromEntries([...text.matchAll(/--([a-z-]+):\s*(#[0-9a-f]{6});/gi)].map((match) => [match[1], match[2]]))
+  const darkStart = css.indexOf('@media (prefers-color-scheme: dark)')
+  const light = tokens(css.slice(0, darkStart))
+  const dark = tokens(css.slice(darkStart, css.indexOf('/* ------------------------------------------------------------- base')))
+  const names = { background: 'bg', surface: 'surface', text: 'ink', mutedText: 'muted', accent: 'accent', accentText: 'accent-ink', border: 'rule', success: 'ok', warning: 'warn', danger: 'bad' }
+  assert.deepEqual(Object.keys(names), COLOR_KEYS)
+  for (const key of COLOR_KEYS) {
+    assert.equal(DEFAULT_COLORS.light[key], light[names[key]], `light ${key}`)
+    assert.equal(DEFAULT_COLORS.dark[key], dark[names[key]], `dark ${key}`)
+  }
+})
+
+test('presets are valid, readable, and few', () => {
+  const names = presetNames()
+  assert.deepEqual(names, ['calm.json', 'night.json', 'precise.json', 'soft.json'])
+  for (const name of names) {
+    const checked = validateTheme(readPreset(name))
+    assert.ok(checked.ok, `${name}: ${checked.problems?.join('; ')}`)
+    for (const mode of ['light', 'dark']) assert.deepEqual(resolvePalette(mode, checked.theme.colors[mode]).notes, [], `${name} ${mode} keeps every chosen colour`)
+  }
+})
+
+test('the precise preset is the default look, token for token', () => {
+  const checked = validateTheme(readPreset('precise.json'))
+  assert.deepEqual(checked.theme.colors, { light: { ...DEFAULT_COLORS.light }, dark: { ...DEFAULT_COLORS.dark } })
+  const css = themeCss(checked.theme, { light: resolvePalette('light').palette, dark: resolvePalette('dark').palette })
+  const base = fs.readFileSync(path.join(distDir, 'styles.css'), 'utf8')
+  const declared = (text) => Object.fromEntries([...text.matchAll(/(--[a-z-]+):\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]))
+  const baseTokens = { ...declared(base.slice(0, base.indexOf('@media (prefers-color-scheme: dark)'))), ...declared(base.slice(base.indexOf('/* Type. [font] */'), base.indexOf('/* ------------------------------------------------------------- base'))) }
+  const generated = declared(css.slice(0, css.indexOf('@media')))
+  for (const [name, value] of Object.entries(generated)) assert.equal(value, baseTokens[name], name)
+  const darkBase = declared(base.slice(base.indexOf('@media (prefers-color-scheme: dark)'), base.indexOf('/* Type. [font] */')))
+  for (const [name, value] of Object.entries(declared(css.slice(css.indexOf('@media'))))) assert.equal(value, darkBase[name], `dark ${name}`)
+})
+
+test('theme validation is strict: unknown keys, bad colours, and values outside a list are not applied', () => {
+  const good = validateTheme({ schemaVersion: 1, name: '  Mine ', font: 'rounded', radius: 'small', density: 'compact', shadow: 'soft', mode: 'light', colors: { light: { accent: '#1A2B3C', text: '#000' } } })
+  assert.ok(good.ok)
+  assert.equal(good.theme.name, 'Mine')
+  assert.deepEqual(good.theme.colors.light, { accent: '#1a2b3c', text: '#000000' }, 'lower-case #rrggbb')
+  assert.deepEqual(validateTheme({ schemaVersion: 1 }).theme, { name: 'Your theme', font: 'system', radius: 'none', density: 'comfortable', shadow: 'none', mode: 'auto', colors: { light: {}, dark: {} } })
+  const cases = [
+    [{ schemaVersion: 1, colors: { light: { accent: '#12' } } }, /colors\.light\.accent “#12” is not a colour like #1d4ed8/],
+    [{ schemaVersion: 1, colors: { light: { accent: '#1d4ed8cc' } } }, /is not a colour/],
+    [{ schemaVersion: 1, colors: { light: { accent: 'red' } } }, /is not a colour/],
+    [{ schemaVersion: 1, colors: { light: { accent: 'url(https://example.test/x)' } } }, /is not a colour/],
+    [{ schemaVersion: 1, colors: { light: { glow: '#ffffff' } } }, /unknown setting “colors\.light\.glow”/],
+    [{ schemaVersion: 1, colors: { sepia: {} } }, /unknown setting “colors\.sepia”/],
+    [{ schemaVersion: 1, logo: 'brand.png' }, /unknown setting “logo”/],
+    [{ schemaVersion: 1, font: 'Comic Sans' }, /font “Comic Sans” is not one of: system, plain, rounded, serif, mono, humanist/],
+    [{ schemaVersion: 1, font: 'https://fonts.example.test/x.css' }, /is not one of/],
+    [{ schemaVersion: 1, radius: 'huge' }, /radius “huge” is not one of: none, small, medium, large/],
+    [{ schemaVersion: 1, density: 2 }, /density 2 is not one of/],
+    [{ schemaVersion: 1, mode: 'sepia' }, /mode “sepia” is not one of: auto, light, dark/],
+    [{ schemaVersion: 1, shadow: 'deep' }, /shadow “deep” is not one of: none, soft/],
+    [{ schemaVersion: 1, name: 'x'.repeat(41) }, /name must be plain text/],
+    [{ schemaVersion: 2 }, /"schemaVersion" must be 1/],
+    [{}, /"schemaVersion" must be 1/],
+    [[], /one JSON object/],
+    [null, /one JSON object/],
+  ]
+  for (const [theme, expected] of cases) {
+    const checked = validateTheme(theme)
+    assert.equal(checked.ok, false, JSON.stringify(theme))
+    assert.match(checked.problems.join('; '), expected)
+  }
+})
+
+test('a colour pair below 4.5:1 keeps the default for that pair and says so', () => {
+  const { palette, notes } = resolvePalette('light', { text: '#aaaaaa', background: '#fdfdf8', accent: '#ffcc00', accentText: '#ffffff', surface: '#fefefe' })
+  assert.equal(palette.text, DEFAULT_COLORS.light.text)
+  assert.equal(palette.background, '#fdfdf8', 'the background stays when the default text passes on it')
+  assert.equal(palette.accent, DEFAULT_COLORS.light.accent)
+  assert.match(notes.join('; '), /light text on background is 2\.\d:1 \(needs 4\.5:1\), so the default text is kept/)
+  assert.match(notes.join('; '), /light accent on background is 1\.\d:1/)
+  // A dark background in light mode fails even with the default text, so both keep their default.
+  const dark = resolvePalette('light', { background: '#101010' })
+  assert.equal(dark.palette.background, DEFAULT_COLORS.light.background)
+  for (const mode of ['light', 'dark']) {
+    for (const chosen of [{}, { background: '#777777' }, { surface: '#000000', text: '#ffffff' }, { accent: '#ffffff', accentText: '#ffffff' }]) {
+      const { palette: resolved } = resolvePalette(mode, chosen)
+      for (const [fg, bg] of CONTRAST_PAIRS) assert.ok(contrastRatio(resolved[fg], resolved[bg]) >= 4.5, `${mode} ${fg}/${bg} ${JSON.stringify(chosen)}`)
+      const bar = barColor(resolved)
+      assert.ok(contrastRatio(bar, resolved.background) >= 3 && contrastRatio(bar, resolved.surface) >= 3, 'chart bars keep 3:1')
+    }
+  }
+})
+
+test('the generated stylesheet holds only fixed values and checked colours', () => {
+  for (const name of presetNames()) {
+    const checked = validateTheme(readPreset(name))
+    const css = themeCss(checked.theme, { light: resolvePalette('light', checked.theme.colors.light).palette, dark: resolvePalette('dark', checked.theme.colors.dark).palette })
+    assert.doesNotMatch(css, /url\(|@import|@font-face|https?:|expression|<\/?style|\\/i, name)
+    assert.ok(css.length < 4096)
+  }
+})
+
+test('reading a theme: missing, good, invalid, low contrast, and theme.css', () => {
+  const root = themeRoot('read')
+  assert.deepEqual(readTheme(root), { state: 'none', name: null, notes: [], tokens: null, customCss: false })
+  write(root, THEME_FILE, JSON.stringify(readPreset('soft.json')))
+  const soft = readTheme(root)
+  assert.equal(soft.state, 'applied')
+  assert.equal(soft.name, 'Soft')
+  assert.deepEqual(soft.notes, [])
+  assert.match(soft.tokens, /--bg: #f7f3ee;/)
+  write(root, THEME_FILE, '{ "schemaVersion": 1, ')
+  assert.deepEqual(readTheme(root).notes, ['theme.json is not valid JSON (check for a missing comma or quote)'])
+  write(root, THEME_FILE, JSON.stringify({ schemaVersion: 1, name: 'Low', colors: { light: { text: '#bbbbbb' } } }))
+  const low = readTheme(root)
+  assert.equal(low.state, 'applied')
+  assert.match(low.notes[0], /light text on background/)
+  assert.match(low.tokens, /--ink: #0e1116;/)
+  write(root, THEME_FILE, JSON.stringify({ schemaVersion: 1, mode: 'dark', colors: { light: { text: '#bbbbbb' } } }))
+  assert.deepEqual(readTheme(root).notes, [], 'a mode that is never shown reports nothing')
+  write(root, THEME_FILE, `{"schemaVersion":1,"description":"${'x'.repeat(17000)}"}`)
+  assert.match(readTheme(root).notes[0], /theme\.json is not used: it must be a plain file/)
+  write(root, THEME_CSS_FILE, 'body { color: red }\n')
+  assert.equal(readTheme(root).customCss, true)
+})
+
+test('a linked or hard-linked theme.json or theme.css is never read', () => {
+  const root = themeRoot('linked')
+  const outside = path.join(scratch, 'theme-outside')
+  write(outside, 'theme.json', JSON.stringify({ schemaVersion: 1, name: OUTSIDE }))
+  write(outside, 'theme.css', `/* ${OUTSIDE} */`)
+  fs.symlinkSync(path.join(outside, 'theme.json'), path.join(root, THEME_FILE))
+  fs.symlinkSync(path.join(outside, 'theme.css'), path.join(root, THEME_CSS_FILE))
+  const linked = readTheme(root)
+  assert.equal(linked.state, 'not-applied')
+  assert.equal(linked.customCss, false)
+  assert.ok(!JSON.stringify(linked).includes(OUTSIDE))
+  assert.match(linked.notes.join('; '), /theme\.json is not used: it must be a plain file in instance\/dashboard\/ \(not a link or folder\)/)
+  assert.match(linked.notes.join('; '), /theme\.css is not used/)
+  const hard = themeRoot('hard')
+  fs.linkSync(path.join(outside, 'theme.json'), path.join(hard, THEME_FILE))
+  assert.equal(readTheme(hard).state, 'not-applied')
+  const folderLink = path.join(scratch, 'theme-folder-link')
+  fs.mkdirSync(path.join(folderLink, 'instance'), { recursive: true })
+  fs.mkdirSync(path.join(outside, 'dashboard'), { recursive: true })
+  write(outside, 'dashboard/theme.json', JSON.stringify({ schemaVersion: 1, name: OUTSIDE }))
+  fs.symlinkSync(path.join(outside, 'dashboard'), path.join(folderLink, 'instance', 'dashboard'))
+  assert.ok(!JSON.stringify(readTheme(fs.realpathSync.native(folderLink))).includes(OUTSIDE), 'a linked instance/dashboard folder is not followed')
+})
+
+test('the page links theme stylesheets only while they apply; the CSP stays strict', async () => {
+  const themeFile = path.join(fixture, THEME_FILE)
+  const cssFile = path.join(fixture, THEME_CSS_FILE)
+  const css = (pathname, extra = {}) => request(port, { pathname, headers: { cookie, 'sec-fetch-site': 'same-origin', ...extra } })
+  try {
+    let page = await signedIn(port)
+    assert.ok(!page.body.includes('/instance-theme/'), 'no theme links by default')
+    assert.ok(!page.body.includes('home-base-theme'), 'the placeholder is removed')
+    assert.equal((await css('/instance-theme/tokens.css')).status, 404)
+    assert.equal((await css('/instance-theme/theme.css')).status, 404, 'theme.css is served only when present')
+    assert.deepEqual(JSON.parse((await api(port, '/api/theme')).body), { schemaVersion: 1, state: 'none', name: null, notes: [], customCss: false })
+
+    write(fixture, THEME_FILE, JSON.stringify(readPreset('soft.json')))
+    write(fixture, THEME_CSS_FILE, '.brand { letter-spacing: 0 }\n')
+    write(fixture, 'instance/theme.css', `/* ${SENTINEL} */`)
+    page = await signedIn(port)
+    const links = [...page.body.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((match) => match[1])
+    assert.deepEqual(links, ['/app/styles.css', '/instance-theme/tokens.css', '/instance-theme/theme.css'], 'base, then tokens, then theme.css')
+    assert.match(page.headers['content-security-policy'], /default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; font-src 'none'/)
+    const tokens = await css('/instance-theme/tokens.css')
+    assert.equal(tokens.status, 200)
+    assert.equal(tokens.headers['content-type'], 'text/css; charset=utf-8')
+    assert.equal(tokens.headers['content-security-policy'], page.headers['content-security-policy'])
+    assert.match(tokens.body, /--radius: 16px;/)
+    const custom = await css('/instance-theme/theme.css')
+    assert.deepEqual([custom.status, custom.body], [200, '.brand { letter-spacing: 0 }\n'])
+    for (const pathname of ['/instance-theme/../theme.css', '/instance-theme/modules/demo/theme.css', '/instance-theme/theme.json', '/instance-theme/x.css', '/instance-theme/%2e%2e/theme.css', '/theme.css']) {
+      const response = await css(pathname)
+      assert.ok(!response.body.includes(SENTINEL), pathname)
+      assert.equal(response.status, 404, pathname)
+    }
+    assert.equal((await request(port, { pathname: '/instance-theme/theme.css', headers: { 'sec-fetch-site': 'same-origin' } })).status, 403, 'needs the sign-in cookie')
+    assert.equal((await css('/instance-theme/theme.css', { 'sec-fetch-site': 'cross-site' })).status, 403)
+    assert.equal((await signedIn(port, '/instance-theme/tokens.css')).status, 403, 'needs fetch metadata')
+    assert.equal((await css('/api/theme')).status, 401, 'the theme endpoint needs the launch nonce')
+    assert.deepEqual(JSON.parse((await api(port, '/api/theme')).body), { schemaVersion: 1, state: 'applied', name: 'Soft', notes: [], customCss: true })
+
+    write(fixture, THEME_FILE, JSON.stringify({ schemaVersion: 1, colours: {} }))
+    fs.rmSync(cssFile)
+    page = await signedIn(port)
+    assert.ok(!page.body.includes('/instance-theme/'), 'an invalid theme links nothing')
+    assert.equal((await css('/instance-theme/tokens.css')).status, 404)
+    assert.deepEqual(JSON.parse((await api(port, '/api/theme')).body).notes, ['unknown setting “colours”'])
+  } finally {
+    fs.rmSync(themeFile, { force: true })
+    fs.rmSync(cssFile, { force: true })
+    fs.rmSync(path.join(fixture, 'instance/theme.css'), { force: true })
+  }
+})
+
+test('the footer note explains a theme in plain words', () => {
+  assert.equal(copy.themeNote({ state: 'none', name: null, notes: [], customCss: false }), null)
+  assert.deepEqual(copy.themeNote({ state: 'applied', name: 'Soft', notes: [], customCss: false }), { text: 'Theme: Soft.', problem: false })
+  assert.match(copy.themeNote({ state: 'not-applied', name: null, notes: ['unknown setting “logo”'], customCss: false }).text, /^Theme not applied: unknown setting “logo”\. The default look is shown\.$/)
+  const many = copy.themeNote({ state: 'not-applied', name: null, notes: ['a', 'b', 'c', 'd', 'e'], customCss: true })
+  assert.equal(many.text, 'Theme not applied: a; b; c (and 2 more). The default look is shown. Your theme.css is applied.')
+  assert.match(copy.themeNote({ state: 'applied', name: 'Low', notes: ['light text on background is 2.1:1 (needs 4.5:1), so the default text is kept'], customCss: false }).text, /Some colours kept the default so text stays readable/)
+  assert.deepEqual(copy.themeNote({ state: 'none', name: null, notes: [], customCss: true }), { text: 'Your theme.css is applied.', problem: false })
+  const main = fs.readFileSync(path.join(distDir, 'main.js'), 'utf8')
+  assert.ok(main.includes("body('foot-theme')") && main.includes('textContent = note.text'), 'the note is written as text')
 })
 
 test('no response ever carried a CORS header', () => {

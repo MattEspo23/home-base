@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "product": "Home Base",
-  "releaseId": "home-base-1.1.0",
-  "version": "1.1.0",
+  "releaseId": "home-base-1.2.0",
+  "version": "1.2.0",
   "starterSourceRoot": "system/starter",
   "maintainedPaths": [
     ".agents",

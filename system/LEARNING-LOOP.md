@@ -71,6 +71,10 @@ If yes, present no more than three candidates at once. For each, show:
 
 If no durable learning emerged, say so plainly and stop.
 
+If Home Base changed in this session and `you/PREFERENCES.md` records a
+standing approval for automatic online-dashboard updates, follow the
+automatic steps in `system/workflows/put-the-dashboard-online.md`.
+
 ## Suggestions
 
 - Offer at most one unsolicited idea per active session.

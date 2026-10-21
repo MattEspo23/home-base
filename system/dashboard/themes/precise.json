@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "name": "Precise",
+  "description": "The default look: crisp lines, square corners, condensed labels, monospaced numbers.",
+  "font": "system",
+  "radius": "none",
+  "density": "comfortable",
+  "shadow": "none",
+  "mode": "auto",
+  "colors": {
+    "light": {
+      "background": "#f6f7f9",
+      "surface": "#ffffff",
+      "text": "#0e1116",
+      "mutedText": "#5a6370",
+      "accent": "#1d4ed8",
+      "accentText": "#ffffff",
+      "border": "#d8dce2",
+      "success": "#17794a",
+      "warning": "#9a6200",
+      "danger": "#b42318"
+    },
+    "dark": {
+      "background": "#0a0c0f",
+      "surface": "#101318",
+      "text": "#e7eaee",
+      "mutedText": "#96a0ac",
+      "accent": "#7c9cff",
+      "accentText": "#0a0c0f",
+      "border": "#232a33",
+      "success": "#4cc38a",
+      "warning": "#e0a43a",
+      "danger": "#f07a6e"
+    }
+  }
+}
