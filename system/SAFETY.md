@@ -39,9 +39,9 @@ same, already-locked project at the end of a session without asking again.
 Only through `node system/dashboard/publish.mjs --out <folder> --auto`, only
 after `--check-locked` passes first, and with the lock checked again
 afterwards. If `--auto` refuses, upload nothing and ask; if a lock check
-fails, the only upload is the placeholder going back, and then ask. It never covers a first upload, a new file or
-module, another project, team, or account, or a change to the lock. The user
-can withdraw it at any time.
+fails, the only upload is the placeholder going back, and then ask. It never
+covers a first upload, a new file or module, another project, team, or
+account, or a change to the lock. The user can withdraw it at any time.
 
 ## Ask at the moment of action
 

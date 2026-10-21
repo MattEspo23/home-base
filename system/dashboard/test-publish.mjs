@@ -432,7 +432,10 @@ test('an automatic update needs a lock check, a copy marked as online, and no ne
   const root = fixture()
   const out = path.join(scratch, 'out-auto', 'home-base-dashboard')
   const run = (...args) => spawnSync(process.execPath, [publishScript, '--home-base', root, ...args], { encoding: 'utf8' })
+  let deployment = 0
   const check = () => recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app'], new Date(Date.now() + 1000))
+  // The check after an upload: production plus the new deployment's address.
+  const checkAfterUpload = () => recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app', `https://home-base-dashboard-d${(deployment += 1)}-scope.vercel.app`], new Date(Date.now() + 1000))
   assert.equal(run('--placeholder', '--out', out).status, 0)
   write(out, '.vercel/project.json', '{ "projectId": "prj_fixture", "projectName": "home-base-dashboard" }\n')
   // (c) Never the first upload: the folder holds only the placeholder.
@@ -454,15 +457,27 @@ test('an automatic update needs a lock check, a copy marked as online, and no ne
   const unmarked = run('--mark-uploaded', '--out', out)
   assert.equal(unmarked.status, 1)
   assert.match(unmarked.stderr, /check the lock after the upload first/)
+  // A production-only check after the build is not the check after an upload.
+  check()
+  const productionOnly = run('--mark-uploaded', '--out', out)
+  assert.equal(productionOnly.status, 1)
+  assert.match(productionOnly.stderr, /address of the deployment just made/)
   // The user's own first upload: build, (upload), check again, mark.
   check()
   assert.equal(run('--out', out).status, 0)
-  check()
+  checkAfterUpload()
   const marked = run('--mark-uploaded', '--out', out)
   assert.equal(marked.status, 0, marked.stderr)
   assert.match(marked.stdout, /Marked as online: \d+ files/)
   const uploaded = JSON.parse(fs.readFileSync(path.join(out, UPLOADED_RECORD), 'utf8'))
   assert.ok(uploaded.files.includes('status.json') && uploaded.files.includes('instance-modules/reading/index.js'))
+  // The same deployment cannot mark a later copy.
+  check()
+  assert.equal(run('--out', out).status, 0)
+  recordLockCheck(out, root, ['https://home-base-dashboard.vercel.app', 'https://home-base-dashboard-d1-scope.vercel.app'], new Date(Date.now() + 1000))
+  assert.match(run('--mark-uploaded', '--out', out).stderr, /address of the deployment just made/)
+  checkAfterUpload()
+  assert.equal(run('--mark-uploaded', '--out', out).status, 0)
   // (a) Every automatic run needs a passing lock check recorded for the folder.
   fs.rmSync(path.join(out, LOCK_RECORD))
   const unchecked = run('--out', out, '--auto')

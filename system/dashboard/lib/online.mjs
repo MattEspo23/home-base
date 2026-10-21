@@ -488,12 +488,19 @@ export function markUploaded(realOut, now = new Date()) {
   const reasons = []
   const foreign = foreignAddressProblem(realOut, checkedAt, addresses)
   if (foreign) reasons.push(foreign)
-  if (!Number.isFinite(built) || !Number.isFinite(checkedAt) || checkedAt < built || now.getTime() - checkedAt > LOCK_RECORD_MAX_AGE_MS || checkedAt - now.getTime() > 60_000) {
-    reasons.push('check the lock after the upload first: --check-locked <production address> <new deployment address> --out <this folder> must pass after this copy was built')
+  // The check after an upload names the production address and the new
+  // deployment's own address, which no earlier mark may have used.
+  let earlier = []
+  if (lstat(path.join(realOut, UPLOADED_RECORD))?.isFile()) {
+    try { earlier = JSON.parse(fs.readFileSync(path.join(realOut, UPLOADED_RECORD), 'utf8')).addresses ?? [] } catch { earlier = [] }
+  }
+  const fresh = addresses.filter((address) => typeof address === 'string' && !(Array.isArray(earlier) && earlier.includes(address)))
+  if (!Number.isFinite(built) || !Number.isFinite(checkedAt) || checkedAt < built || now.getTime() - checkedAt > LOCK_RECORD_MAX_AGE_MS || checkedAt - now.getTime() > 60_000 || addresses.length < 2 || fresh.length === 0) {
+    reasons.push('check the lock after the upload first: --check-locked <production address> <new deployment address> --out <this folder> must pass after this copy was built, with the address of the deployment just made')
   }
   if (reasons.length) throw new PublishRefused(reasons)
   const files = manifest.files.map((item) => item?.path).filter((item) => typeof item === 'string').sort()
-  fs.writeFileSync(path.join(realOut, UPLOADED_RECORD), `${JSON.stringify({ schemaVersion: 1, markedAt: now.toISOString(), copyBuiltAt: manifest.createdAt, files }, null, 2)}\n`)
+  fs.writeFileSync(path.join(realOut, UPLOADED_RECORD), `${JSON.stringify({ schemaVersion: 1, markedAt: now.toISOString(), copyBuiltAt: manifest.createdAt, addresses: [...new Set([...(Array.isArray(earlier) ? earlier : []), ...addresses])], files }, null, 2)}\n`)
   return files
 }
 
@@ -508,7 +515,7 @@ export function requireSameFiles(realOut, previous, files) {
     try { uploaded = JSON.parse(fs.readFileSync(recordPath, 'utf8')).files } catch { uploaded = null }
   }
   if (previous?.kind !== 'snapshot' || !Array.isArray(uploaded)) {
-    throw new PublishRefused(['this folder has no copy of your dashboard marked as online (only the placeholder, or a copy that never went online), so an automatic update stops here: show the file list and ask the user'])
+    throw new PublishRefused(['this folder has no copy of your dashboard marked as online (only the placeholder, or a copy that never went online or was put online before 1.2.0 could mark it), so an automatic update stops here: show the file list, ask the user, and after that update run --mark-uploaded'])
   }
   const before = new Set(uploaded.filter((item) => typeof item === 'string'))
   const added = [...files.keys()].filter((name) => !before.has(name)).sort()
