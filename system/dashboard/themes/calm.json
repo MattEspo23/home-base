@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "name": "Calm",
+  "description": "Calm and light: system font everywhere, soft greys, large rounded corners, gentle shadows, generous spacing.",
+  "font": "plain",
+  "radius": "large",
+  "density": "airy",
+  "shadow": "soft",
+  "mode": "auto",
+  "colors": {
+    "light": {
+      "background": "#f4f4f6",
+      "surface": "#ffffff",
+      "text": "#1c1c1f",
+      "mutedText": "#6a6a70",
+      "accent": "#0062cc",
+      "accentText": "#ffffff",
+      "border": "#e2e2e7",
+      "success": "#1f7a3a",
+      "warning": "#8a5800",
+      "danger": "#c0281b"
+    },
+    "dark": {
+      "background": "#111113",
+      "surface": "#1d1d20",
+      "text": "#f4f4f6",
+      "mutedText": "#a2a2a8",
+      "accent": "#5aa9ff",
+      "accentText": "#0b0b0d",
+      "border": "#2e2e32",
+      "success": "#4ccf7c",
+      "warning": "#f0b44c",
+      "danger": "#ff7b6f"
+    }
+  }
+}

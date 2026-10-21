@@ -11,7 +11,7 @@ This directory contains the maintained Home Base behavior.
 - `scenarios/` — clean-copy acceptance cases
 - `starter/` — pristine sources used to materialize user-owned files in a
   release archive; never personalized during normal use
-- `distribution/` — pinned Skill Vault lock, licenses, 40-Skill catalog,
+- `distribution/` — pinned Skill Vault lock, licenses, 41-Skill catalog,
   projection generator, and packaged release identity receipt
 - `validate.mjs` — local structural checks
 - `prove.mjs` — deterministic behavior and reference-system proof

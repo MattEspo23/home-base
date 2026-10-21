@@ -74,9 +74,10 @@ do not apply inside `instance/`. Still keep passwords, keys, and tokens out of
 it; Home Base never stores secret values. Back it up with the rest of your
 Home Base folder.
 
-Private dashboard modules can live in `instance/dashboard/`; the local
-dashboard loads them at runtime (see `system/dashboard/README.md`), and the
-public build never reads them.
+Private dashboard modules and your dashboard theme (`theme.json`, and an
+optional `theme.css`) can live in `instance/dashboard/`; the local dashboard
+loads them at runtime (see `system/dashboard/README.md`), and the public build
+never reads them.
 
 Private skills can live in `instance/skills/<name>/SKILL.md`. To make them
 available in every project, `node system/instance-skills.mjs` previews links
@@ -85,7 +86,7 @@ an outside action: the agent shows the preview and asks for your approval at
 that moment before it runs the same command with `--apply`. `--remove`
 previews removing only the links that point into this `instance/`, and
 `--remove --apply` deletes them after the same approval. Names must be kebab-case and may
-not reuse one of the 40 repository Skill names.
+not reuse one of the 41 repository Skill names.
 
 ## What the comparison means
 

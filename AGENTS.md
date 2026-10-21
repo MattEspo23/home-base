@@ -74,6 +74,8 @@ Home Base is the user’s durable AI workspace. Treat the user as a person tryin
   exact `http://127.0.0.1:<port>/#key=…` address it prints, once (never
   rewrite it as `localhost`), and tell them how to stop it. If permission is
   denied, ask the user to run the command in their own Terminal window.
+- “Redesign my Home Base in this style,” “style my dashboard,” “make it look
+  like this,” or equivalent → `system/workflows/style-the-dashboard.md`
 - “Does this need an app/dashboard/site?” or “deploy this” →
   `system/workflows/review-interface-and-deployment.md`
 - “Make this system better,” “what did we learn?”, or a system/project
@@ -88,7 +90,7 @@ User-created workflows are indexed in `skills/INDEX.md`; tool and connection
 records are indexed in `tools/INDEX.md`. When a request matches a skill, read
 its `SKILL.md` before doing the task.
 
-The release includes 40 repository Skills across both supported adapters. The
+The release includes 41 repository Skills across both supported adapters. The
 complete list is `system/distribution/SKILL-CATALOG.md`. A large Skill set may
 not fit in the host’s initial summary; explicit `$skill-name` invocation still
 uses the installed package. Do not confuse bundled Skills with installed

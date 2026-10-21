@@ -93,3 +93,20 @@ export function checkedLabel(iso               )         {
   const [year, month, day] = iso.split('-').map(Number)
   return `Checked ${day} ${MONTHS[month - 1]} ${year}`
 }
+
+// One line in the footer: which theme applies, and in plain words why all or
+// part of it does not. The stylesheets themselves are linked by the server.
+export function themeNote(theme             )                                            {
+  const notes = theme.notes.slice(0, 3)
+  const more = theme.notes.length > 3 ? ` (and ${theme.notes.length - 3} more)` : ''
+  const custom = theme.customCss ? ' Your theme.css is applied.' : ''
+  if (theme.state === 'not-applied') {
+    return { text: `Theme not applied: ${notes.join('; ')}${more}. The default look is shown.${custom}`, problem: true }
+  }
+  if (theme.state === 'applied') {
+    const kept = notes.length ? ` Some colours kept the default so text stays readable: ${notes.join('; ')}${more}.` : ''
+    return { text: `Theme: ${theme.name ?? 'Your theme'}.${kept}${custom}`, problem: notes.length > 0 }
+  }
+  if (notes.length) return { text: `${notes.join('; ')}${more}.${custom}`, problem: true }
+  return theme.customCss ? { text: custom.trim(), problem: false } : null
+}

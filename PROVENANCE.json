@@ -24,7 +24,8 @@
     "plan-home-base-tool",
     "review-home-base-interface",
     "review-home-base-update",
-    "start-home-base"
+    "start-home-base",
+    "style-home-base-dashboard"
   ],
   "skillVault": {
     "state": "released",

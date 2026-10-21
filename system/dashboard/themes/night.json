@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "name": "Night",
+  "description": "Always dark, deep blue, plain system type, small rounded corners.",
+  "font": "plain",
+  "radius": "small",
+  "density": "comfortable",
+  "shadow": "none",
+  "mode": "dark",
+  "colors": {
+    "dark": {
+      "background": "#0b1020",
+      "surface": "#121a2e",
+      "text": "#e6eaf5",
+      "mutedText": "#9ba7c3",
+      "accent": "#8fb4ff",
+      "accentText": "#0b1020",
+      "border": "#27324e",
+      "success": "#5fd39b",
+      "warning": "#f0b860",
+      "danger": "#ff8f87"
+    }
+  }
+}

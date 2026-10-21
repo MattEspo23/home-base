@@ -1,6 +1,6 @@
 # Included Skills
 
-Home Base includes 40 editable repository Skills: 13 Home Base core workflows and 27 pinned Skill Vault packages. Codex may omit some names from its first context summary when the Skill list is large; that is a display-budget limit, not a missing package. Invoke any package explicitly as `$skill-name`.
+Home Base includes 41 editable repository Skills: 14 Home Base core workflows and 27 pinned Skill Vault packages. Codex may omit some names from its first context summary when the Skill list is large; that is a display-budget limit, not a missing package. Invoke any package explicitly as `$skill-name`.
 
 | Skill | Layer | What it does | Explicit invocation |
 |---|---|---|---|
@@ -33,6 +33,7 @@ Home Base includes 40 editable repository Skills: 13 Home Base core workflows an
 | `semantic-tree` | Skill Vault | Turn a broad or tangled topic into a structured decision map that connects questions, evidence, assumptions, and next actions. Use when an idea feels larger than the first answer, several concerns are mixed together, or the user needs to see what actually changes the decision before choosing a direction. | `$semantic-tree` |
 | `setup-espo-skills` | Skill Vault | Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills. | `$setup-espo-skills` |
 | `start-home-base` | Home Base core | Start or resume the beginner Home Base interview when the user says start, get me started, set this up, or continue my setup. | `$start-home-base` |
+| `style-home-base-dashboard` | Home Base core | Redesign the local Home Base dashboard in whatever style the user asks for, from their words, a screenshot, brand colours, or a preset, using the lightest change that achieves it. | `$style-home-base-dashboard` |
 | `tdd` | Skill Vault | Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests. | `$tdd` |
 | `teach` | Skill Vault | Teach the user a new skill or concept, within this workspace. | `$teach` |
 | `to-questionnaire` | Skill Vault | Turn a decision you can't fully answer into a questionnaire for someone else to fill in. | `$to-questionnaire` |

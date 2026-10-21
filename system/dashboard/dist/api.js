@@ -45,3 +45,4 @@ async function getJson   (path        )             {
 
 export const getStatus = ()                          => getJson                ('/api/status')
 export const getModules = ()                                         => getJson                               ('/api/modules')
+export const getTheme = ()                       => getJson             ('/api/theme')

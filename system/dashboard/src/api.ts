@@ -1,4 +1,4 @@
-import type { HomeBaseStatus, InstanceModule } from './types.ts'
+import type { HomeBaseStatus, InstanceModule, ThemeStatus } from './types.ts'
 
 function meta(name: string): string {
   const element = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)
@@ -44,3 +44,4 @@ async function getJson<T>(path: string): Promise<T> {
 
 export const getStatus = (): Promise<HomeBaseStatus> => getJson<HomeBaseStatus>('/api/status')
 export const getModules = (): Promise<{ modules: InstanceModule[] }> => getJson<{ modules: InstanceModule[] }>('/api/modules')
+export const getTheme = (): Promise<ThemeStatus> => getJson<ThemeStatus>('/api/theme')

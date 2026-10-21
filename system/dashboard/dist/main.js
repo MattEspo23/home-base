@@ -1,7 +1,7 @@
 // Generated from src/main.ts by system/dashboard/build.mjs. Do not edit.
-import { RequestFailed, dbName, getModules, getStatus } from './api.js'
+import { RequestFailed, dbName, getModules, getStatus, getTheme } from './api.js'
 
-import { STEPS, checkedLabel, howToOpen, nextStep, notShown, progress, stateLabel } from './copy.js'
+import { STEPS, checkedLabel, howToOpen, nextStep, notShown, progress, stateLabel, themeNote } from './copy.js'
 import { SAMPLE_NOTICE, formatMoney, sampleFinance, sampleHabits } from './sample.js'
 
 
@@ -322,6 +322,19 @@ async function renderDomains(modules                  )                {
   }))
 }
 
+// ---------------------------------------------------------------- theme
+
+async function renderTheme()                {
+  let theme
+  try { theme = await getTheme() } catch { return }
+  const note = themeNote(theme)
+  const target = body('foot-theme')
+  if (!note) return
+  target.textContent = note.text
+  target.classList.toggle('foot-theme-problem', note.problem)
+  target.hidden = false
+}
+
 // ---------------------------------------------------------------- start
 
 // Plain words for each way loading can fail.
@@ -352,6 +365,7 @@ async function start()                {
   renderHome(status)
   renderAssistants(status)
   if (status.version) body('foot-note').textContent = `Home Base ${status.version}. Reads a few names from your Home Base folder. It only writes its own settings file.`
+  void renderTheme()
   let modules                   = []
   try { modules = (await getModules()).modules } catch { modules = [] }
   await renderDomains(modules)

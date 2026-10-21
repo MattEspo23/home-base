@@ -30,5 +30,14 @@ export interface HomeBaseStatus {
   unlinked: { projects: number; systems: number; skills: number; assistants: number }
 }
 
+// The user's look, from instance/dashboard/theme.json and theme.css.
+export interface ThemeStatus {
+  schemaVersion: number
+  state: 'none' | 'applied' | 'not-applied'
+  name: string | null
+  notes: string[]
+  customCss: boolean
+}
+
 export interface InstanceModule { id: string; title: string; url: string }
 export interface ModuleApi { getStatus(): Promise<HomeBaseStatus>; dbName: string }

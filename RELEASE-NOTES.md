@@ -60,6 +60,13 @@ checks every fingerprint, and then finishes. See
   fictional samples until you add your own). It reads a few names, writes only
   its own settings file, and needs a private sign-in key that it prints when
   it starts. See [the dashboard guide](./system/dashboard/README.md).
+- **Make the dashboard yours.** Ask your assistant to redesign your dashboard
+  in your own words, with or without a screenshot, or start from a preset
+  (`precise`, `soft`, `night`, `calm`). Your look lives in
+  `instance/dashboard/` (`theme.json`, `theme.css`, modules), which updates
+  never touch. Hard-to-read colours keep the default, and a theme the
+  dashboard cannot use is skipped with a note. The default look is unchanged.
+  See “Make it yours” in [the dashboard guide](./system/dashboard/README.md).
 - **A private `instance/` folder.** Put private tools, dashboard modules,
   private skills, and other files that are only yours in `instance/`. Updates,
   packages, and proofs never read, copy, or delete it, and Git ignores it.
