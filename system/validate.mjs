@@ -467,7 +467,7 @@ try {
 
 // The release version comes from the manifest. Only the stable channel stays
 // pinned to the last public stable release.
-const LAST_STABLE_VERSION = '1.1.0'
+const LAST_STABLE_VERSION = '1.2.0'
 const releaseVersion = releaseManifest?.version ?? ''
 const isPrerelease = /^1\.\d+\.\d+-dev\.\d+$/.test(releaseVersion)
 // A stable build is only ever the pinned last public stable release; a new
